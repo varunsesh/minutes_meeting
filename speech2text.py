@@ -1,7 +1,7 @@
 from openai import OpenAI
 from dotenv import load_dotenv
 from record_audio import transcribe_audio
-
+from datetime import datetime
 
 load_dotenv()
 
@@ -11,7 +11,11 @@ client = OpenAI(
     # api_key="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"
 )
 
+# Get the current date and time
+now = datetime.now()
 
+# Format the date and time as "Month Day, Year"
+formatted_date = now.strftime("%B %d, %Y")
 
 from docx import Document
   
@@ -73,6 +77,7 @@ def meeting_minutes(transcription):
     action_items = action_item_extraction(transcription)
     sentiment = sentiment_analysis(transcription)
     return {
+        'meeting_date': formatted_date,
         'abstract_summary': abstract_summary,
         'key_points': key_points,
         'action_items': action_items,

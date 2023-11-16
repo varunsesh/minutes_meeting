@@ -1,56 +1,50 @@
-import openai
 import pyaudio
 import wave
+from pydub import AudioSegment
+import openai
+from dotenv import load_dotenv
 import os
 
-
 def transcribe_audio(client):
-    # Initialize the PyAudio object
     p = pyaudio.PyAudio()
-
-    # Open a microphone stream
     stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=1024)
 
-    # Create a WAV file to temporarily store audio data
-    wav_filename = "temp.wav"
-    wav_file = wave.open(wav_filename, "wb")
-    wav_file.setnchannels(1)
-    wav_file.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-    wav_file.setframerate(16000)
+    frames = []
 
-    # Initialize the OpenAI API client
-    transcription_file = "transcription.txt"
     try:
+        print("Recording... (Press Ctrl+C to stop)")
         while True:
-            print("Listening... (Press Ctrl+C to stop)")
-            audio_data = stream.read(1024)
-            wav_file.writeframes(audio_data)
+            data = stream.read(1024)
+            frames.append(data)
 
     except KeyboardInterrupt:
-        pass
-    finally:
-        wav_file.close()
+        print("\nRecording stopped")
 
-        with open(wav_filename, "rb") as audio_file:
-            print("Here now opening audio file")
-            transcript = client.audio.transcriptions.create(model="whisper-1",file=audio_file)
- # Print the transcription
-        print("Transcription:", transcript)
-        with open(transcription_file, "a") as transcript_file:
-          transcript_file.write(transcript.text)
- # Reset the WAV file for the next audio chunk
-        wav_file = wave.open(wav_filename, "wb")
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-        wav_file.setframerate(16000)
-        # Close the audio stream and terminate PyAudio
+    finally:
         stream.stop_stream()
         stream.close()
         p.terminate()
 
-        # Close and remove the temporary WAV file
-        wav_file.close()
-        os.remove(wav_filename)
+        temp_wav_filename = "temp_audio.wav"
+        with wave.open(temp_wav_filename, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+            wf.setframerate(16000)
+            wf.writeframes(b"".join(frames))
 
-    return transcript.text 
+        audio_segment = AudioSegment.from_wav(temp_wav_filename)
+        temp_mp3_filename = "temp_audio.mp3"
+        audio_segment.export(temp_mp3_filename, format="mp3")
 
+        with open(temp_mp3_filename, "rb") as mp3_file:
+            transcript = client.audio.transcriptions.create(model="whisper-1", file=mp3_file)
+        
+        print("Transcription:", transcript.text)
+        os.remove(temp_wav_filename)
+        os.remove(temp_mp3_filename)
+    return transcript.text
+
+if __name__ == "__main__":
+    load_dotenv()
+    client = openai.Client()
+    transcribe_audio(client)
