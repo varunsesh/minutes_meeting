@@ -1,6 +1,6 @@
 from openai import OpenAI
 from dotenv import load_dotenv
-from record_audio import transcribe_audio
+from record_audio import AudioRecorder
 from datetime import datetime
 
 load_dotenv()
@@ -115,7 +115,8 @@ def save_as_docx(minutes, filename):
 
 
 if __name__=="__main__":
-    transcription = transcribe_audio(client)#transcribe_audio(audio_file_path)
+    recorder = AudioRecorder(client)
+    transcription = recorder.transcribe_audio()#transcribe_audio(client)#transcribe_audio(audio_file_path)
     minutes = meeting_minutes(transcription)
     print(minutes)
     save_as_docx(minutes, 'meeting_minutes.docx')
