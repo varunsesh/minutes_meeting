@@ -25,29 +25,24 @@ def transcribe_audio(client):
             print("Listening... (Press Ctrl+C to stop)")
             audio_data = stream.read(1024)
             wav_file.writeframes(audio_data)
-            # You can adjust the audio length based on your requirements
-            if wav_file.tell() >= 30 * 16000:
-                # Close the WAV file and transcribe the audio using the Whisper ASR API
-                wav_file.close()
-
-                with open(wav_filename, "rb") as audio_file:
-                    print("Here now opening audio file")
-                    transcript = client.audio.transcriptions.create(model="whisper-1",file=audio_file)
-
-                # Print the transcription
-                print("Transcription:", transcript)
-                with open(transcription_file, "a") as transcript_file:
-                  transcript_file.write(transcript.text)
-
-                # Reset the WAV file for the next audio chunk
-                wav_file = wave.open(wav_filename, "wb")
-                wav_file.setnchannels(1)
-                wav_file.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-                wav_file.setframerate(16000)
 
     except KeyboardInterrupt:
         pass
     finally:
+        wav_file.close()
+
+        with open(wav_filename, "rb") as audio_file:
+            print("Here now opening audio file")
+            transcript = client.audio.transcriptions.create(model="whisper-1",file=audio_file)
+ # Print the transcription
+        print("Transcription:", transcript)
+        with open(transcription_file, "a") as transcript_file:
+          transcript_file.write(transcript.text)
+ # Reset the WAV file for the next audio chunk
+        wav_file = wave.open(wav_filename, "wb")
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+        wav_file.setframerate(16000)
         # Close the audio stream and terminate PyAudio
         stream.stop_stream()
         stream.close()
@@ -58,3 +53,4 @@ def transcribe_audio(client):
         os.remove(wav_filename)
 
     return transcript.text 
+

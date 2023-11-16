@@ -113,5 +113,4 @@ if __name__=="__main__":
     transcription = transcribe_audio(client)#transcribe_audio(audio_file_path)
     minutes = meeting_minutes(transcription)
     print(minutes)
-
     save_as_docx(minutes, 'meeting_minutes.docx')
