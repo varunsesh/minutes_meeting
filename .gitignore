@@ -1,0 +1,4 @@
+Whisper/*
+__pycache__/*
+env/*
+*.mp4
