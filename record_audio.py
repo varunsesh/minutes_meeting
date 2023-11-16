@@ -13,6 +13,19 @@ class AudioRecorder:
 
     def transcribe_audio(self):
         p = pyaudio.PyAudio()
+        #Stereo mix with audio
+        device_index = None
+        for i in range(p.get_device_count()):
+            dev = p.get_device_info_by_index(i)
+            if "Stereo Mix" in dev['name']:
+                device_index = i
+                break
+
+        if device_index is None:
+            print("Stereo Mix device not found")
+            p.terminate()
+            return
+        
         stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=1024)
         frames = []
         try:
