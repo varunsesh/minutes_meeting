@@ -3,19 +3,7 @@ from dotenv import load_dotenv
 from record_audio import AudioRecorder
 from datetime import datetime
 
-load_dotenv()
 
-client = OpenAI(
-    # defaults to os.environ.get("OPENAI_API_KEY")
-    # api_key="My API Key",
-    # api_key="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"
-)
-
-# Get the current date and time
-now = datetime.now()
-
-# Format the date and time as "Month Day, Year"
-formatted_date = now.strftime("%B %d, %Y")
 
 from docx import Document
   
@@ -115,6 +103,18 @@ def save_as_docx(minutes, filename):
 
 
 if __name__=="__main__":
+    load_dotenv()
+
+    client = OpenAI(
+        # defaults to os.environ.get("OPENAI_API_KEY")
+        # api_key="My API Key",
+    )
+
+    # Get the current date and time
+    now = datetime.now()
+
+# Format the date and time as "Month Day, Year"
+    formatted_date = now.strftime("%B %d, %Y")
     recorder = AudioRecorder(client)
     transcription = recorder.transcribe_audio()#transcribe_audio(client)#transcribe_audio(audio_file_path)
     minutes = meeting_minutes(transcription)
