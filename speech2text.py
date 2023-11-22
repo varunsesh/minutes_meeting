@@ -115,8 +115,8 @@ if __name__=="__main__":
 
 # Format the date and time as "Month Day, Year"
     formatted_date = now.strftime("%B %d, %Y")
-    recorder = AudioRecorder(client)
-    transcription = recorder.transcribe_audio()#transcribe_audio(client)#transcribe_audio(audio_file_path)
+    recorder = AudioRecorder()
+    transcription = recorder.transcribe_audio()
     minutes = meeting_minutes(transcription)
     print(minutes)
     save_as_docx(minutes, 'meeting_minutes.docx')

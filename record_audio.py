@@ -4,10 +4,10 @@ from pydub import AudioSegment
 import openai
 from dotenv import load_dotenv
 import os
+import whisper
 
 class AudioRecorder:
-    def __init__(self, client):
-        self.__client = client
+    def __init__(self):
         self.__temp_audio_wav="temp_audio.wav"
         self.__temp_audio_mp3="temp_audio.mp3"
 
@@ -53,13 +53,13 @@ class AudioRecorder:
             temp_mp3_filename = "temp_audio.mp3"
             audio_segment.export(temp_mp3_filename, format="mp3")
 
-            with open(temp_mp3_filename, "rb") as mp3_file:
-                transcript = self.__client.audio.transcriptions.create(model="whisper-1", file=mp3_file)
+            model = whisper.load_model("base")
+            result = model.transcribe(self.__temp_audio_mp3)
 
-            print("Transcription:", transcript.text)
+            print("Transcription:", result["text"])
             os.remove(temp_wav_filename)
             os.remove(temp_mp3_filename)
-        return transcript.text
+        return result["text"]
     
     def transcribe_recorded_audio(client):
         temp_mp3_filename = "temp_audio.mp3"
@@ -75,6 +75,5 @@ class AudioRecorder:
 
 if __name__ == "__main__":
     load_dotenv()
-    client = openai.Client()
-    recorder = AudioRecorder(client)
+    recorder = AudioRecorder()
     print(recorder.transcribe_audio())
