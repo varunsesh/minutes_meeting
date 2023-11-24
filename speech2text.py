@@ -2,6 +2,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from record_audio import AudioRecorder, RecordingApp
 from datetime import datetime
+import os
 
 
 
@@ -93,18 +94,28 @@ def sentiment_analysis(transcription):
         ]
     )
     return response.choices[0].message.content
-
 def save_as_docx(minutes, filename):
-    doc = Document()
-    for key, value in minutes.items():
+    # Check if the document exists and load it, otherwise create a new one
+    if os.path.exists(filename):
+        doc = Document(filename)
+    else:
+        doc = Document()
+
+    # Iterate through the minutes in reverse order to add latest on top
+    for key, value in reversed(minutes.items()):
+        # Insert new content at the beginning of the document
         # Replace underscores with spaces and capitalize each word for the heading
         heading = ' '.join(word.capitalize() for word in key.split('_'))
-        doc.add_heading(heading, level=1)
-        doc.add_paragraph(value)
-        # Add a line break between sections
-        doc.add_paragraph()
-    doc.save(filename)
+        # Insert a paragraph at the beginning
+        p = doc.paragraphs[0].insert_paragraph_before(heading)
+        p.style = doc.styles['Heading 1']
+        # Insert text content
+        p = doc.paragraphs[0].insert_paragraph_before(value)
+        # Insert a line break after the section
+        doc.paragraphs[0].insert_paragraph_before('')
 
+    # Save the updated document
+    doc.save(filename)
 
 
 if __name__=="__main__":
