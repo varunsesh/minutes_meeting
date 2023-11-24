@@ -1,6 +1,6 @@
 from openai import OpenAI
 from dotenv import load_dotenv
-from record_audio import AudioRecorder
+from record_audio import AudioRecorder, RecordingApp
 from datetime import datetime
 
 
@@ -9,6 +9,7 @@ from docx import Document
   
 
 def action_item_extraction(transcription):
+    print("creating action items...")
     response = client.chat.completions.create(
         model="gpt-4",
         temperature=0,
@@ -26,6 +27,7 @@ def action_item_extraction(transcription):
     return response.choices[0].message.content
 
 def key_points_extraction(transcription):
+    print("key points extraction...")
     response = client.chat.completions.create(
         model="gpt-4",
         temperature=0,
@@ -43,6 +45,7 @@ def key_points_extraction(transcription):
     return response.choices[0].message.content
 
 def abstract_summary_extraction(transcription):
+    print("abstract summary rendering...")
     response = client.chat.completions.create(
         model="gpt-4",
         temperature=0,
@@ -60,6 +63,7 @@ def abstract_summary_extraction(transcription):
     return response.choices[0].message.content
 
 def meeting_minutes(transcription):
+    print("Preparing meeting minutes...")
     abstract_summary = abstract_summary_extraction(transcription)
     key_points = key_points_extraction(transcription)
     action_items = action_item_extraction(transcription)
@@ -73,6 +77,7 @@ def meeting_minutes(transcription):
     }
 
 def sentiment_analysis(transcription):
+    print("generating sentiment")
     response = client.chat.completions.create(
         model="gpt-4",
         temperature=0,
@@ -116,7 +121,9 @@ if __name__=="__main__":
 # Format the date and time as "Month Day, Year"
     formatted_date = now.strftime("%B %d, %Y")
     recorder = AudioRecorder()
-    transcription = recorder.transcribe_audio()
+    app = RecordingApp(recorder)
+    app.mainloop()
+    transcription = app.get_transcript()
     minutes = meeting_minutes(transcription)
     print(minutes)
     save_as_docx(minutes, 'meeting_minutes.docx')
