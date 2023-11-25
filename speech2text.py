@@ -64,12 +64,41 @@ def abstract_summary_extraction(transcription):
     )
     return response.choices[0].message.content
 
+def split_transcript(transcription, max_length=4000):
+    """Split the transcription into segments not exceeding the max_length."""
+    words = transcription.split()
+    segments = []
+    current_segment = []
+
+    for word in words:
+        if len(' '.join(current_segment + [word])) > max_length:
+            segments.append(' '.join(current_segment))
+            current_segment = [word]
+        else:
+            current_segment.append(word)
+
+    # Add the last segment
+    segments.append(' '.join(current_segment))
+    return segments
+
+def process_segments(segments, extraction_function):
+    """Process each segment and combine the results."""
+    combined_result = ""
+    for segment in segments:
+        result = extraction_function(segment)
+        combined_result += result + "\n"
+    return combined_result.strip()
+
+
 def meeting_minutes(transcription):
     print("Preparing meeting minutes...")
-    abstract_summary = abstract_summary_extraction(transcription)
-    key_points = key_points_extraction(transcription)
-    action_items = action_item_extraction(transcription)
-    sentiment = sentiment_analysis(transcription)
+    segments = split_transcript(transcription)
+
+    abstract_summary = process_segments(segments, abstract_summary_extraction)
+    key_points = process_segments(segments, key_points_extraction)
+    action_items = process_segments(segments, action_item_extraction)
+    sentiment = process_segments(segments, sentiment_analysis)
+
     return {
         'meeting_date': formatted_date,
         'abstract_summary': abstract_summary,
@@ -108,8 +137,8 @@ def save_as_docx(minutes, filename):
         # Replace underscores with spaces and capitalize each word for the heading
         heading = ' '.join(word.capitalize() for word in key.split('_'))
         # Insert a paragraph at the beginning
-        p = doc.paragraphs[0].insert_paragraph_before(heading)
         p.style = doc.styles['Heading 1']
+        p = doc.paragraphs[0].insert_paragraph_before(heading)
         # Insert text content
         p = doc.paragraphs[0].insert_paragraph_before(value)
         # Insert a line break after the section
@@ -139,3 +168,4 @@ if __name__=="__main__":
     minutes = meeting_minutes(transcription)
     print(minutes)
     save_as_docx(minutes, 'meeting_minutes.docx')
+    

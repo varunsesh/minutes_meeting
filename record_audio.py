@@ -96,6 +96,8 @@ class RecordingApp(tk.Tk):
        self.progress_bar.pack(pady=5)
        self.select_file_button = tk.Button(self, text="Select Audio File", command=self.select_file)
        self.select_file_button.pack(pady=5)
+       self.upload_transcript_button = tk.Button(self, text="Upload Transcript File", command=self.upload_transcript)
+       self.upload_transcript_button.pack(pady=5)
 
 
     def start_transcription(self):
@@ -151,6 +153,17 @@ class RecordingApp(tk.Tk):
             self.transcription_text.insert(tk.INSERT, self.__transcription)
             self.transcription_text.config(state='disabled')
 
+    def upload_transcript(self):
+        filepath = filedialog.askopenfilename(title="Select Transcript File", filetypes=[("Text Files", "*.txt")])
+        if filepath:
+            with open(filepath, 'r', encoding='utf-8') as file:
+                transcript = file.read()
+            self.__transcription = transcript
+            self.transcription_text.config(state='normal')
+            self.transcription_text.delete(1.0, tk.END)
+            self.transcription_text.insert(tk.INSERT, self.__transcription)
+            self.transcription_text.config(state='disabled')
+    
 if __name__ == "__main__":
     print("Starting the recorder app...")
     recorder = AudioRecorder()
