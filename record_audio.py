@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import scrolledtext, ttk
 from datetime import datetime
 import os
+import time
+import sys
 
 class AudioRecorder:
     def __init__(self):
@@ -15,7 +17,7 @@ class AudioRecorder:
         self.frames = []
         self.p = None
         self.stream = None
-        self.model = whisper.load_model("small")
+        self.model = whisper.load_model("base")
 
     def set_device_index(self, device_name):
         self.p = pyaudio.PyAudio()
@@ -61,11 +63,15 @@ class AudioRecorder:
         os.remove(wav_filename)
 
         result = self.model.transcribe(mp3_filename)
-        os.remove(mp3_filename)
+        #os.remove(mp3_filename)
 
         # with open(transcription_file, "w") as f:
         #     f.write(result["text"])
 
+        return result["text"]
+    
+    def transcribe_from_recorded_audio(self, mp3filename):
+        result = self.model.transcribe(mp3filename)
         return result["text"]
 
 class RecordingApp(tk.Tk):
@@ -86,7 +92,24 @@ class RecordingApp(tk.Tk):
        self.transcription_text.pack(pady=10)
        self.transcription_text.config(state='disabled')
        self.__transcription = ""
-       
+       self.progress_bar = ttk.Progressbar(self, orient='horizontal', mode='indeterminate')
+       self.progress_bar.pack(pady=5)
+
+
+    def start_transcription(self):
+        self.progress_bar.start(10)  # Start the indeterminate progress bar
+        Thread(target=self.run_transcription, daemon=True).start()
+
+    def run_transcription(self):
+        # Simulate transcription process
+        time.sleep(5)  # Replace with actual transcription call
+        self.stop_transcription()
+
+    def stop_transcription(self):
+        self.progress_bar.stop()  # Stop the progress bar
+        # Update the GUI with transcription results
+        # ...
+
     def toggle_recording(self):
         if self.recording_state:
             self.stop_recording()
@@ -94,6 +117,7 @@ class RecordingApp(tk.Tk):
         else:
             self.start_recording()
             self.toggle_button.config(text="Stop Recording")
+            self.start_transcription()
         self.recording_state = not self.recording_state
 
 
@@ -117,6 +141,13 @@ class RecordingApp(tk.Tk):
         return self.__transcription
 
 if __name__ == "__main__":
-    recorder = AudioRecorder()
-    app = RecordingApp(recorder)
-    app.mainloop()
+    if len(sys.argv) > 1:
+        print(sys.argv[1])
+        recorder = AudioRecorder()
+        transcription = recorder.transcribe_from_recorded_audio(sys.argv[1])#app.get_transcript()
+        print(transcription)
+    else:
+        print("Starting the recorder app...")
+        recorder = AudioRecorder()
+        app = RecordingApp(recorder)
+        app.mainloop()

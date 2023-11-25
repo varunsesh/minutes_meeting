@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from record_audio import AudioRecorder, RecordingApp
 from datetime import datetime
 import os
+import sys
 
 
 
@@ -132,9 +133,14 @@ if __name__=="__main__":
 # Format the date and time as "Month Day, Year"
     formatted_date = now.strftime("%B %d, %Y")
     recorder = AudioRecorder()
-    app = RecordingApp(recorder)
-    app.mainloop()
-    transcription = app.get_transcript()
+    if len(sys.argv)>1:
+        print(f"Creating minutes for {sys.argv[1]}")
+        transcription = recorder.transcribe_from_recorded_audio(sys.argv[1])#app.get_transcript()
+    else:
+        app = RecordingApp(recorder)
+        app.mainloop()
+        transcription = app.get_transcript()
+    
     minutes = meeting_minutes(transcription)
     print(minutes)
     save_as_docx(minutes, 'meeting_minutes.docx')
