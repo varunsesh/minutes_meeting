@@ -4,7 +4,7 @@ from pydub import AudioSegment
 import whisper
 from threading import Thread
 import tkinter as tk
-from tkinter import scrolledtext, ttk
+from tkinter import scrolledtext, ttk, filedialog
 from datetime import datetime
 import os
 import time
@@ -94,6 +94,8 @@ class RecordingApp(tk.Tk):
        self.__transcription = ""
        self.progress_bar = ttk.Progressbar(self, orient='horizontal', mode='indeterminate')
        self.progress_bar.pack(pady=5)
+       self.select_file_button = tk.Button(self, text="Select Audio File", command=self.select_file)
+       self.select_file_button.pack(pady=5)
 
 
     def start_transcription(self):
@@ -139,15 +141,18 @@ class RecordingApp(tk.Tk):
 
     def get_transcript(self):
         return self.__transcription
+    
+    def select_file(self):
+        filepath = filedialog.askopenfilename(title="Select Audio File", filetypes=[("Audio Files", "*.mp3 *.wav")])
+        if filepath:
+            self.__transcription = self.recorder.transcribe_from_recorded_audio(filepath)
+            self.transcription_text.config(state='normal')
+            self.transcription_text.delete(1.0, tk.END)
+            self.transcription_text.insert(tk.INSERT, self.__transcription)
+            self.transcription_text.config(state='disabled')
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        print(sys.argv[1])
-        recorder = AudioRecorder()
-        transcription = recorder.transcribe_from_recorded_audio(sys.argv[1])#app.get_transcript()
-        print(transcription)
-    else:
-        print("Starting the recorder app...")
-        recorder = AudioRecorder()
-        app = RecordingApp(recorder)
-        app.mainloop()
+    print("Starting the recorder app...")
+    recorder = AudioRecorder()
+    app = RecordingApp(recorder)
+    app.mainloop()
