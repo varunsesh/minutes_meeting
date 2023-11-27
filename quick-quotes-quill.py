@@ -3,10 +3,6 @@ from dotenv import load_dotenv
 from record_audio import AudioRecorder, RecordingApp
 from datetime import datetime
 import os
-import sys
-
-
-
 from docx import Document
 
 
@@ -25,7 +21,7 @@ def meeting_minutes(transcription):
     segments = split_transcript(transcription)
     segment_summaries = [summarize_segment(segment) for segment in segments]
     final_meeting_summary = final_summary(segment_summaries)
-    return truncate_to_word_limit(final_meeting_summary, 10000)
+    return truncate_to_word_limit(final_meeting_summary, 5000)
 
 
 def truncate_to_word_limit(content, word_limit):
@@ -72,7 +68,7 @@ def split_transcript(transcription, max_length=4000):
     segments.append(' '.join(current_segment))
     return segments
 
-
+#using gpt4
 def summarize_segment(segment):
     print("Summarizing segment...")
     response = client.chat.completions.create(
@@ -81,7 +77,7 @@ def summarize_segment(segment):
         messages=[
             {
                 "role": "system",
-                "content": "You are an AI that summarizes text. Please provide a concise summary of the following segment:"
+                "content": "You are an AI that summarizes text. Please provide a comprehensive summary of the following segment, include summary, action items and key points:"
             },
             {
                 "role": "user",
@@ -99,7 +95,7 @@ def final_summary(segments):
 
 if __name__=="__main__":
     load_dotenv()
-
+    
     client = OpenAI(
         # defaults to os.environ.get("OPENAI_API_KEY")
         # api_key="My API Key",
@@ -114,7 +110,6 @@ if __name__=="__main__":
     app = RecordingApp(recorder)
     app.mainloop()
     transcription = app.get_transcript()
-    minutes = meeting_minutes(transcription)
-    print(minutes)
-    save_as_docx(minutes, 'meeting_minutes.docx', formatted_date)
+    summary = meeting_minutes(transcription)
+    save_as_docx(summary, 'meeting_minutes.docx', formatted_date)
     
