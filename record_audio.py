@@ -17,7 +17,7 @@ class AudioRecorder:
         self.frames = []
         self.p = None
         self.stream = None
-        self.model = whisper.load_model("base")
+        self.model = whisper.load_model("small")
 
     def set_device_index(self, device_name):
         self.p = pyaudio.PyAudio()
@@ -126,6 +126,7 @@ class RecordingApp(tk.Tk):
 
 
     def start_recording(self):
+        print("start recording...")
         selected_device = self.device_combobox.get()
         self.recorder.set_device_index(selected_device)
         self.recorder.start_recording()
@@ -133,6 +134,7 @@ class RecordingApp(tk.Tk):
         self.recording_thread.start()
 
     def stop_recording(self):
+        print("stop recording...")
         self.recorder.stop_recording()
         self.recording_thread.join()
         self.__transcription += self.recorder.save_and_transcribe()

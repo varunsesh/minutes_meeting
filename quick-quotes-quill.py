@@ -21,7 +21,7 @@ def meeting_minutes(transcription):
     segments = split_transcript(transcription)
     segment_summaries = [summarize_segment(segment) for segment in segments]
     final_meeting_summary = final_summary(segment_summaries)
-    return truncate_to_word_limit(final_meeting_summary, 5000)
+    return final_meeting_summary#truncate_to_word_limit(final_meeting_summary, 5000)
 
 
 def truncate_to_word_limit(content, word_limit):
@@ -77,7 +77,7 @@ def summarize_segment(segment):
         messages=[
             {
                 "role": "system",
-                "content": "You are an AI that summarizes text. Please provide a comprehensive summary of the following segment, include summary, action items and key points:"
+                "content": "You are an AI that summarizes text. Please provide a comprehensive summary of the following segment, include separate sections for summary, action items and key points:"
             },
             {
                 "role": "user",
@@ -85,11 +85,19 @@ def summarize_segment(segment):
             }
         ]
     )
+    print(response.choices[0].message.content)
     return response.choices[0].message.content
 
 def final_summary(segments):
-    combined_summary = ' '.join(segments)
-    return summarize_segment(combined_summary)
+    i = 1
+    combined_summary = ""
+    for segment in segments:
+        title = "\n" + "\n" + "Summary Section: " + str(i) + "\n"
+        combined_summary += title
+        combined_summary += segment
+        i+=1
+    # combined_summary = ' '.join(segments)
+    return combined_summary#summarize_segment(combined_summary)
 
 
 
