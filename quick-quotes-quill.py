@@ -91,13 +91,13 @@ def summarize_segment(segment):
 def final_summary(segments):
     i = 1
     combined_summary = ""
-    for segment in segments:
-        title = "\n" + "\n" + "Summary Section: " + str(i) + "\n"
-        combined_summary += title
-        combined_summary += segment
-        i+=1
-    # combined_summary = ' '.join(segments)
-    return combined_summary#summarize_segment(combined_summary)
+    # for segment in segments:
+    #     title = "\n" + "\n" + "Summary Section: " + str(i) + "\n"
+    #     combined_summary += title
+    #     combined_summary += segment
+    #     i+=1
+    combined_summary = summarize_segment(' '.join(segments))
+    return combined_summary
 
 
 
@@ -117,7 +117,9 @@ if __name__=="__main__":
     recorder = AudioRecorder()
     app = RecordingApp(recorder)
     app.mainloop()
-    transcription = app.get_transcript()
-    summary = meeting_minutes(transcription)
-    save_as_docx(summary, 'meeting_minutes.docx', formatted_date)
+    if(app.get_permission()):
+        transcription = app.get_transcript()
+        summary = meeting_minutes(transcription)
+        doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
+        save_as_docx(summary, doc_name, formatted_date)
     

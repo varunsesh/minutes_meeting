@@ -17,6 +17,7 @@ class AudioRecorder:
         self.frames = []
         self.p = None
         self.stream = None
+        self._mp3filename = ""
         self.model = whisper.load_model("small")
 
     def set_device_index(self, device_name):
@@ -36,39 +37,44 @@ class AudioRecorder:
 
     def stop_recording(self):
         self.is_recording = False
+        print("Stopping in parent class")
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
-        self.p.terminate()
+            print("Swooping down")
+            self.stream = None
+        # Don't terminate self.p here
 
     def record_audio(self):
         while self.is_recording:
             data = self.stream.read(1024, exception_on_overflow=False)
             self.frames.append(data)
 
-    def save_and_transcribe(self):
+    def transcribe(self):
+        result = self.model.transcribe(self._mp3filename)
+        return result["text"]
+
+    def save_for_transcribe(self):
+        print("Saving for transcription...")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         wav_filename = f"recording_{timestamp}.wav"
-        mp3_filename = f"recording_{timestamp}.mp3"
-        transcription_file = f"transcription_{timestamp}.txt"
+        self._mp3filename = f"recording_{timestamp}.mp3"
 
-        with wave.open(wav_filename, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(self.p.get_sample_size(pyaudio.paInt16))
-            wf.setframerate(16000)
-            wf.writeframes(b''.join(self.frames))
+        try:
+            with wave.open(wav_filename, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(self.p.get_sample_size(pyaudio.paInt16))
+                wf.setframerate(16000)
+                wf.writeframes(b''.join(self.frames))
+        finally:
+            if self.p:
+                self.p.terminate()
+                self.p = None
 
         audio_segment = AudioSegment.from_wav(wav_filename)
-        audio_segment.export(mp3_filename, format="mp3")
+        audio_segment.export(self._mp3filename, format="mp3")
         os.remove(wav_filename)
 
-        result = self.model.transcribe(mp3_filename)
-        #os.remove(mp3_filename)
-
-        # with open(transcription_file, "w") as f:
-        #     f.write(result["text"])
-
-        return result["text"]
     
     def transcribe_from_recorded_audio(self, mp3filename):
         result = self.model.transcribe(mp3filename)
@@ -77,9 +83,10 @@ class AudioRecorder:
 class RecordingApp(tk.Tk):
     def __init__(self, recorder):
        super().__init__()
+       self.__generate_minutes = False
        self.recorder = recorder
        self.title("Audio Recorder")
-       self.geometry("400x400")
+       self.geometry("750x500")
        self.recording_state = False  # Added to track the recording stat
        self.device_label = tk.Label(self, text="Select Input Device:")
        self.device_label.pack(pady=5)
@@ -87,18 +94,24 @@ class RecordingApp(tk.Tk):
        self.device_combobox.pack(pady=5)
        self.device_combobox.set("Stereo Mix")
        self.toggle_button = tk.Button(self, text="Start Recording", command=self.toggle_recording)
-       self.toggle_button.pack(pady=10) 
-       self.transcription_text = scrolledtext.ScrolledText(self, wrap=tk.WORD, height=10)
-       self.transcription_text.pack(pady=10)
-       self.transcription_text.config(state='disabled')
+       self.toggle_button.pack(pady=5)
        self.__transcription = ""
-       self.progress_bar = ttk.Progressbar(self, orient='horizontal', mode='indeterminate')
-       self.progress_bar.pack(pady=5)
        self.select_file_button = tk.Button(self, text="Select Audio File", command=self.select_file)
        self.select_file_button.pack(pady=5)
        self.upload_transcript_button = tk.Button(self, text="Upload Transcript File", command=self.upload_transcript)
        self.upload_transcript_button.pack(pady=5)
+       self.generate_transcript_button = tk.Button(self, text="Generate Transcript File", command=self.generate_transcript_now)
+       self.generate_transcript_button.pack(pady=5)
+       self.generate_minutes_button = tk.Button(self, text="Generate Minutes File", command=self.generate_minutes)
+       self.generate_minutes_button.pack(pady=5)
+       self.transcription_text = scrolledtext.ScrolledText(self, wrap=tk.WORD, height=10)
+       self.transcription_text.pack(pady=10)
+       self.transcription_text.config(state='disabled')
 
+       # Configure the columns and rows to expand with the window
+       self.grid_columnconfigure(0, weight=1)  # Make column 0 expandable
+       self.grid_columnconfigure(1, weight=1)  # Make column 1 expandable
+       self.grid_rowconfigure(0, weight=1)     # Make row 0 expandable
 
     def start_transcription(self):
         self.progress_bar.start(10)  # Start the indeterminate progress bar
@@ -121,7 +134,7 @@ class RecordingApp(tk.Tk):
         else:
             self.start_recording()
             self.toggle_button.config(text="Stop Recording")
-            self.start_transcription()
+            #self.start_transcription()
         self.recording_state = not self.recording_state
 
 
@@ -134,14 +147,16 @@ class RecordingApp(tk.Tk):
         self.recording_thread.start()
 
     def stop_recording(self):
-        print("stop recording...")
-        self.recorder.stop_recording()
-        self.recording_thread.join()
-        self.__transcription += self.recorder.save_and_transcribe()
-        self.transcription_text.config(state='normal')
-        self.transcription_text.delete(1.0, tk.END)
-        self.transcription_text.insert(tk.INSERT, self.__transcription)
-        self.transcription_text.config(state='disabled')
+        try:
+            print("stopping recording...")
+            self.recorder.stop_recording()
+            if self.recording_thread.is_alive():
+                self.recording_thread.join()
+            self.recorder.save_for_transcribe()
+        except Exception as e:
+            print(f"Error occurred: {e}")
+            raise
+        
 
     def get_transcript(self):
         return self.__transcription
@@ -166,6 +181,19 @@ class RecordingApp(tk.Tk):
             self.transcription_text.insert(tk.INSERT, self.__transcription)
             self.transcription_text.config(state='disabled')
     
+    def generate_transcript_now(self):
+        self.__transcription += self.recorder.transcribe()
+        self.transcription_text.config(state='normal')
+        self.transcription_text.delete(1.0, tk.END)
+        self.transcription_text.insert(tk.INSERT, self.__transcription)
+        self.transcription_text.config(state='disabled')
+        
+    def generate_minutes(self):
+        self.__generate_minutes = True
+
+    def get_permission(self):
+        return self.__generate_minutes
+
 if __name__ == "__main__":
     print("Starting the recorder app...")
     recorder = AudioRecorder()
