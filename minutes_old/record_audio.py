@@ -1,3 +1,5 @@
+import atexit
+import subprocess
 import pyaudio
 import wave
 from pydub import AudioSegment
@@ -8,7 +10,7 @@ from tkinter import scrolledtext, ttk, filedialog
 from datetime import datetime
 import os
 import time
-import sys
+import platform
 
 class AudioRecorder:
     def __init__(self):
@@ -81,6 +83,15 @@ class AudioRecorder:
         return result["text"]
 
 class RecordingApp(tk.Tk):
+
+    os_name = platform.system()
+
+    def load_pulseaudio_loopback(latency_msec=1):
+        return subprocess.getoutput(f"pactl load-module module-loopback latency_msec={latency_msec}")
+
+    def unload_pulseaudio_loopback(module_id):
+        subprocess.getoutput(f"pactl unload-module {module_id}")
+
     def __init__(self, recorder):
        super().__init__()
        self.__generate_minutes = False
@@ -143,6 +154,7 @@ class RecordingApp(tk.Tk):
         selected_device = self.device_combobox.get()
         self.recorder.set_device_index(selected_device)
         self.recorder.start_recording()
+
         self.recording_thread = Thread(target=self.recorder.record_audio)
         self.recording_thread.start()
 
@@ -194,8 +206,26 @@ class RecordingApp(tk.Tk):
     def get_permission(self):
         return self.__generate_minutes
 
+def load_pulseaudio_loopback(latency_msec=1):
+    module_id = subprocess.getoutput(f"pactl load-module module-loopback latency_msec={latency_msec}")
+    print(f"PulseAudio loopback module loaded with ID: {module_id}")
+    return module_id
+
+def unload_pulseaudio_loopback(module_id):
+    subprocess.getoutput(f"pactl unload-module {module_id}")
+    print("PulseAudio loopback module unloaded")
+
+
+def setup_linux():
+    module_id = load_pulseaudio_loopback()
+    atexit.register(unload_pulseaudio_loopback, module_id)
+
+
 if __name__ == "__main__":
     print("Starting the recorder app...")
+    os_name = platform.system()
+    if os_name == "Linux":
+        setup_linux()
     recorder = AudioRecorder()
     app = RecordingApp(recorder)
     app.mainloop()
