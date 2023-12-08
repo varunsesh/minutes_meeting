@@ -1,7 +1,5 @@
 Whisper/*
 __pycache__/*
-env/*
 *.mp4
 .env
-meeting_minutes.docx
-transcription.txt
+Recordings

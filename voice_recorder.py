@@ -22,8 +22,12 @@ class VoiceRecorder:
 
     def capture_audio(self):
         while self.is_active:
-            data = self.audio_stream.read(1024, exception_on_overflow=False)
-            self.audio_frames.append(data)
+            try:
+                data = self.audio_stream.read(1024, exception_on_overflow=False)
+                self.audio_frames.append(data)
+            except IOError as e:
+                # Handle the error as needed
+                pass
 
     def end_recording(self):
         self.is_active = False
@@ -37,19 +41,25 @@ class VoiceRecorder:
         return self._transcribe_audio()
 
     def _save_audio(self):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        wav_file = f"recording_{timestamp}.wav"
-        self.mp3_file_name = f"recording_{timestamp}.mp3"
+        recordings_folder = 'Recordings'
+        if not os.path.exists(recordings_folder):
+            os.makedirs(recordings_folder)
 
-        with wave.open(wav_file, "wb") as wave_file:
+        # Format file names with the path to the 'Recordings' folder
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        wav_file_path = os.path.join(recordings_folder, f"recording_{timestamp}.wav")
+        mp3_file_path = os.path.join(recordings_folder, f"recording_{timestamp}.mp3")
+        self.mp3_file_name = mp3_file_path
+
+        with wave.open(wav_file_path, "wb") as wave_file:
             wave_file.setnchannels(1)
             wave_file.setsampwidth(self.pyaudio_instance.get_sample_size(pyaudio.paInt16))
             wave_file.setframerate(16000)
             wave_file.writeframes(b''.join(self.audio_frames))
 
-        audio_segment = AudioSegment.from_wav(wav_file)
+        audio_segment = AudioSegment.from_wav(wav_file_path)
         audio_segment.export(self.mp3_file_name, format="mp3")
-        os.remove(wav_file)
+        os.remove(wav_file_path)
 
     def _transcribe_audio(self):
         transcription_result = self.transcription_model.transcribe(self.mp3_file_name)
