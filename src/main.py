@@ -11,6 +11,6 @@ if __name__ == "__main__":
         app = TranscriptionApp(recorder) 
         app.mainloop()
     except Exception as e :
-        print("Exception Failed to initialize application")
+        print("Exception Failed to initialize application", e)
 
     

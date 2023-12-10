@@ -41,9 +41,8 @@ class VoiceRecorder:
         return self._transcribe_audio()
 
     def _save_audio(self):
-        recordings_folder = 'Recordings'
-        if not os.path.exists(recordings_folder):
-            os.makedirs(recordings_folder)
+        recordings_folder = os.path.join(os.path.dirname(__file__), '..', 'recordings')
+        os.makedirs(recordings_folder, exist_ok=True)
 
         # Format file names with the path to the 'Recordings' folder
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
