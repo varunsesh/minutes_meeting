@@ -1,59 +1,73 @@
-import tkinter as tk
-from tkinter import filedialog, scrolledtext
 from threading import Thread
-from io import BytesIO
 import os
 from openai import OpenAI
 from datetime import datetime
 from openai import OpenAI 
 from dotenv import load_dotenv
 from google_docs_manager import GoogleDocsManager
+from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QVBoxLayout, QWidget, QFileDialog
 
+options = QFileDialog.Options()
+options |= QFileDialog.DontUseNativeDialog
 
-class TranscriptionApp(tk.Tk):
+class TranscriptionApp(QMainWindow):
     def __init__(self, voice_recorder):
         super().__init__()
         self.voice_recorder = voice_recorder
         self.google_docs_manager = GoogleDocsManager()
         self.client = self.initialize_openai_client()
-        self.initialize_ui()
+        self.initUI()
 
     def initialize_openai_client(self):
         load_dotenv()
         return OpenAI()
+    
+    def initUI(self):
+        self.setWindowTitle("Mr Minutes")
+        self.setGeometry(100, 100, 800, 600)
 
-    def initialize_ui(self):
-        self.title("Mr Minutes")
-        self.geometry("750x500")
-        self.start_recording_button = tk.Button(self, text="Start Recording", command=self.toggle_recording)
-        self.start_recording_button.pack(pady=5)
+        centralWidget = QWidget(self)
+        self.setCentralWidget(centralWidget)
 
-        self.transcription_display = scrolledtext.ScrolledText(self, wrap=tk.WORD, height=10)
-        self.transcription_display.pack(pady=10)
-        self.transcription_display.config(state='disabled')
+        layout = QVBoxLayout(centralWidget)
 
-        self.initialize_additional_buttons()
+        self.transcription_display = QTextEdit(self)
+        self.transcription_display.setReadOnly(True)
+        layout.addWidget(self.transcription_display)
 
-    def initialize_additional_buttons(self):
-        self.select_file_button = tk.Button(self, text="Upload Recording", command=self.load_audio_file)
-        self.select_file_button.pack(pady=5)
+        self.recap_button = QPushButton("Recap Previous Discussion", self)
+        self.recap_button.clicked.connect(self.handle_recap)
+        layout.addWidget(self.recap_button)
 
-        self.upload_transcript_button = tk.Button(self, text="Upload Transcript", command=self.load_transcript)
-        self.upload_transcript_button.pack(pady=5)
+        self.start_recording_button = QPushButton("Start Recording", self)
+        self.start_recording_button.clicked.connect(self.toggle_recording)
+        layout.addWidget(self.start_recording_button)
 
-        self.generate_transcript_button = tk.Button(self, text="Transcribe", command=self.create_transcript)
-        self.generate_transcript_button.pack(pady=5)
+        self.upload_recording_button = QPushButton("Upload Recording", self)
+        self.upload_recording_button.clicked.connect(self.load_audio_file)
+        layout.addWidget(self.upload_recording_button)
 
-        self.generate_minutes_button = tk.Button(self, text="Summarize", command=self.create_minutes)
-        self.generate_minutes_button.pack(pady=5)
+        self.upload_transcript_button = QPushButton("Upload Transcript", self)
+        self.upload_transcript_button.clicked.connect(self.load_transcript)
+        layout.addWidget(self.upload_transcript_button)
+
+        self.transcribe_button = QPushButton("Transcribe", self)
+        self.transcribe_button.clicked.connect(self.create_transcript)
+        layout.addWidget(self.transcribe_button)
+
+        self.summarize_button = QPushButton("Summarize", self)
+        self.summarize_button.clicked.connect(self.create_minutes)
+        layout.addWidget(self.summarize_button)
+        
+
 
     def toggle_recording(self):
         if self.voice_recorder.is_active:
             self.end_recording()
-            self.start_recording_button.config(text="Start Recording")
+            self.start_recording_button.setText("Start Recording")
         else:
             self.begin_recording()
-            self.start_recording_button.config(text="Stop Recording")
+            self.start_recording_button.setText("Stop Recording")
 
     def begin_recording(self):
         self.voice_recorder.begin_recording()
@@ -67,24 +81,29 @@ class TranscriptionApp(tk.Tk):
         self.voice_recorder.transcription = self.voice_recorder.save_audio_and_transcribe()
         self.update_transcription_display(self.voice_recorder.transcription)
 
+    def handle_recap(self):
+        if getattr(self.voice_recorder.channel, 'get_busy', lambda: False)():
+            self.voice_recorder.handle_recap("stop")
+            self.recap_button.setText("Recap Previous Discussion")
+        else:
+            self.voice_recorder.handle_recap("play")
+            self.recap_button.setText("Stop")
+    
     def update_transcription_display(self, transcription):
-        self.transcription_display.config(state='normal')
-        self.transcription_display.delete(1.0, tk.END)
-        self.transcription_display.insert(tk.INSERT, transcription)
-        self.transcription_display.config(state='disabled')
+        self.transcription_display.clear()
+        self.transcription_display.setText(transcription)
 
     def load_audio_file(self):
-        filepath = filedialog.askopenfilename(title="Select Audio File", filetypes=[("MP3 Files", "*.mp3"), ("WAV Files", "*.wav")])
-
-        if filepath:
-            self.voice_recorder.mp3_file_name = filepath  # Assuming VoiceRecorder can handle external file paths
-            self.voice_recorder.transcription = self.voice_recorder._transcribe_audio()  # Call the transcription method
+        file_name,_ = QFileDialog.getOpenFileName(self, "Select Audio File", "", "Audio Files (*.mp3 *.wav)", options=options)
+        if file_name:
+            self.voice_recorder.mp3_file_name = file_name  # Assuming VoiceRecorder can handle external file paths
+            self.voice_recorder.transcription = self.voice_recorder._transcribe_audio()
             self.update_transcription_display(self.voice_recorder.transcription)
 
     def load_transcript(self):
-        filepath = filedialog.askopenfilename(title="Select Transcript File", filetypes=[("Text Files", "*.txt")])
-        if filepath:
-            with open(filepath, 'r', encoding='utf-8') as file:
+        file_name,_ = QFileDialog.getOpenFileName(self, "Select Transcript File", "","Text Files (*.txt)", options=options)
+        if file_name:
+            with open(file_name, 'r', encoding='utf-8') as file:
                 transcript = file.read()
                 self.voice_recorder.transcription = transcript
             self.update_transcription_display(transcript)
@@ -142,7 +161,6 @@ class TranscriptionApp(tk.Tk):
         doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
         google_doc_id = os.environ.get("GOOGLE_DOC_ID")
 
-        transcription = self.voice_recorder.get_transcription()
         segments = self.split_transcript()
         summary = self.process_and_summarize(segments)
         self.google_docs_manager.save_and_update_docx_on_drive(summary, doc_name, formatted_date, google_doc_id)

@@ -4,3 +4,4 @@ Whisper/*
 .env
 recordings
 *.mp3
+token.json
