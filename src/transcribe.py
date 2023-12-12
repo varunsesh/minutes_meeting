@@ -5,7 +5,7 @@ from datetime import datetime
 from openai import OpenAI 
 from dotenv import load_dotenv
 from google_docs_manager import GoogleDocsManager
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QVBoxLayout, QWidget, QFileDialog
+from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog
 
 options = QFileDialog.Options()
 options |= QFileDialog.DontUseNativeDialog
@@ -29,35 +29,44 @@ class TranscriptionApp(QMainWindow):
         centralWidget = QWidget(self)
         self.setCentralWidget(centralWidget)
 
-        layout = QVBoxLayout(centralWidget)
+        mainLayout = QVBoxLayout(centralWidget)
+        buttonLayout = QHBoxLayout()
 
         self.transcription_display = QTextEdit(self)
         self.transcription_display.setReadOnly(True)
-        layout.addWidget(self.transcription_display)
+        mainLayout.addWidget(self.transcription_display)
 
         self.recap_button = QPushButton("Recap Previous Discussion", self)
         self.recap_button.clicked.connect(self.handle_recap)
-        layout.addWidget(self.recap_button)
+        self.recap_button.setFixedSize(200, 40)
+        buttonLayout.addWidget(self.recap_button)
 
         self.start_recording_button = QPushButton("Start Recording", self)
         self.start_recording_button.clicked.connect(self.toggle_recording)
-        layout.addWidget(self.start_recording_button)
+        self.start_recording_button.setFixedSize(200, 40)
+        buttonLayout.addWidget(self.start_recording_button)
 
         self.upload_recording_button = QPushButton("Upload Recording", self)
         self.upload_recording_button.clicked.connect(self.load_audio_file)
-        layout.addWidget(self.upload_recording_button)
+        self.upload_recording_button.setFixedSize(200, 40)
+        buttonLayout.addWidget(self.upload_recording_button)
 
         self.upload_transcript_button = QPushButton("Upload Transcript", self)
         self.upload_transcript_button.clicked.connect(self.load_transcript)
-        layout.addWidget(self.upload_transcript_button)
+        self.upload_transcript_button.setFixedSize(200, 40)
+        buttonLayout.addWidget(self.upload_transcript_button)
 
         self.transcribe_button = QPushButton("Transcribe", self)
         self.transcribe_button.clicked.connect(self.create_transcript)
-        layout.addWidget(self.transcribe_button)
+        self.transcribe_button.setFixedSize(200, 40)
+        buttonLayout.addWidget(self.transcribe_button)
 
         self.summarize_button = QPushButton("Summarize", self)
         self.summarize_button.clicked.connect(self.create_minutes)
-        layout.addWidget(self.summarize_button)
+        self.summarize_button.setFixedSize(200, 40)
+        buttonLayout.addWidget(self.summarize_button)
+
+        mainLayout.addLayout(buttonLayout)
         
 
 

@@ -1,15 +1,131 @@
 import atexit
+import os
 import platform
 import subprocess
 import re
 import logging
-import tkinter as tk
-from tkinter import messagebox
+import sys
+import zipfile
+from PyQt5.QtWidgets import QApplication, QMessageBox
 import webbrowser
+import ctypes
+import sys
+import pyaudio
+
+import requests
+
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
 
 def setup_logging():
     """Setup the logging configuration."""
     logging.basicConfig(level=logging.INFO)
+
+def is_voicemeeter_installed():
+    import winreg
+    try:
+        registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\VoiceMeeter_Key"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path, 0, winreg.KEY_READ):
+            return True
+    except FileNotFoundError:
+        return False
+    
+def run_as_admin(argv=None, debug=False):
+    shell32 = ctypes.windll.shell32
+    if argv is None and shell32.IsUserAnAdmin():
+        # Already running as admin
+        return True
+
+    if argv is None:
+        argv = sys.argv
+
+    if hasattr(sys, '_MEIPASS'):
+        arguments = map(str, argv[1:])
+    else:
+        arguments = map(str, argv)
+
+    argument_line = u' '.join(arguments)
+    executable = str(sys.executable)
+    if debug:
+        print("Command line: ", executable, argument_line)
+    ret = shell32.ShellExecuteW(None, "runas", executable, argument_line, None, 1)
+    if int(ret) <= 32:
+        return False
+    return None
+
+def install_voicemeeter():
+    msgBox = QMessageBox()
+    msgBox.setIcon(QMessageBox.Question)
+    msgBox.setText("Voicemeeter is not installed. Do you want to install it now?")
+    msgBox.setWindowTitle("Install Voicemeeter")
+    msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    if msgBox.exec() == QMessageBox.Yes:
+        if not is_admin():
+            run_as_admin()
+        else:
+            # Download and install Voicemeeter
+            voicemeeter_url = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v1088.zip"
+            download_path = "VoicemeeterSetup.zip"
+            extraction_path = "Voicemeeter_Installation"
+
+            response = requests.get(voicemeeter_url)
+            with open(download_path, 'wb') as file:
+                file.write(response.content)
+
+            with zipfile.ZipFile(download_path, 'r') as zip_ref:
+                zip_ref.extractall(extraction_path)
+        
+            # Assuming the installer is an .exe file inside the zip
+            installer_path = os.path.join(extraction_path, "VoicemeeterSetup.exe")
+            subprocess.run(installer_path, shell=True)
+
+def configure_voicemeeter():
+    instructions = (
+    "Set Voicemeeter as the Default Recording Device:\n"
+    "1. Right-click on the sound icon in your system tray and select 'Sounds'.\n"
+    "2. Go to the 'Recording' tab.\n"
+    "3. Find Voicemeeter Output, right-click on it, and set it as the default device.\n\n"
+    "Configure Voicemeeter:\n"
+    "1. Open Voicemeeter.\n"
+    "2. For the hardware input, select your microphone.\n"
+    "3. For the hardware out, select your main speakers or headphones.\n"
+    "4. Adjust the input and output levels to avoid feedback or distortion.\n\n"
+    "Routing Audio from Speakers to Microphone:\n"
+    "1. In Voicemeeter, route your microphone to one of the virtual outputs (B1 or B2).\n"
+    "2. Then, select the same virtual output (B1 or B2) as the input in the application "
+    "where you want the audio to be sent (like a recording software or a communication app).\n\n"
+    "Preventing Playback Through Speakers:\n"
+    "1. To prevent playback through speakers, ensure that the virtual output (B1 or B2) used "
+    "for routing the microphone is not also set as an output on the Voicemeeter.\n\n"
+)
+
+    QMessageBox.information(None, "Configure Voicemeeter", instructions)
+
+def check_voicemeeter_set_as_default():
+    pa = pyaudio.PyAudio()
+    try:
+        default_device_index = pa.get_default_input_device_info()['index']
+        device_info = pa.get_device_info_by_index(default_device_index)
+        return "VoiceMeeter" in device_info.get('name')
+    finally:
+        pa.terminate()
+
+def prompt_for_default_device_setting():
+    QMessageBox.warning(None, "Configure Recording Device", 
+                        "VoiceMeeter is not set as the default recording device. "
+                        "Please open Sound Settings and set it as the default device.",
+                        QMessageBox.Ok)
+    webbrowser.open("ms-settings:sound")
+    
+def handle_windows_audio(audio_utils):
+    if not is_voicemeeter_installed():
+        install_voicemeeter()
+        configure_voicemeeter()
+    elif not check_voicemeeter_set_as_default():
+        prompt_for_default_device_setting()
 
 class AudioUtils:
     def __init__(self):
@@ -73,35 +189,17 @@ class AudioUtils:
         else:
             logging.error("Could not find default sink monitor or source.")
 
-def check_stereo_mix() -> tuple:
-    """Check if Stereo Mix is available and enabled."""
-    from pycaw.pycaw import AudioUtilities
-    devices = AudioUtilities.GetRecordingDevices()
-    stereo_mix = [device for device in devices if "Stereo Mix" in device.name]
-
-    if not stereo_mix:
-        return False, "Stereo Mix not found"
-    
-    return (stereo_mix[0].state == 1, "Stereo Mix is enabled" if stereo_mix[0].state == 1 else "Stereo Mix is disabled")
-
 def audio_setup():
     """Set up the audio based on the operating system."""
     os_name = platform.system()
+    app = QApplication(sys.argv)
     audio_utils = AudioUtils()
 
     if os_name == "Linux":
         audio_utils.setup_virtual_source()
     elif os_name == "Windows":
-        result, message = check_stereo_mix()
-        if not result:
-            root = tk.Tk()
-            root.withdraw()  # Hide the main tkinter window
+        handle_windows_audio(audio_utils)
 
-            messagebox.showinfo("Stereo Mix Status", message)
-            if messagebox.askyesno("Open Settings", "Do you want to open the Sound settings now?"):
-                webbrowser.open("ms-settings:sound")
-
-            root.destroy()
     atexit.register(audio_utils.unload_modules)
 
 if __name__ == "__main__":
