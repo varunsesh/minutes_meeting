@@ -23,8 +23,6 @@ class TranscriptionApp(QMainWindow):
         return OpenAI()
     
     def initUI(self):
-        self.setWindowTitle("Mr Minutes")
-        self.setGeometry(100, 100, 800, 600)
 
         centralWidget = QWidget(self)
         self.setCentralWidget(centralWidget)
@@ -118,6 +116,7 @@ class TranscriptionApp(QMainWindow):
             self.update_transcription_display(transcript)
 
     def create_transcript(self):
+        print(self.voice_recorder.mp3_file_name)
         if self.voice_recorder.mp3_file_name:
             self.voice_recorder.transcription = self.voice_recorder._transcribe_audio()
             self.update_transcription_display(self.voice_recorder.transcription)

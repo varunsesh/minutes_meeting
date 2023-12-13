@@ -1,131 +1,120 @@
 import atexit
+import ctypes
+import logging
 import os
 import platform
-import subprocess
+import pyaudio
 import re
-import logging
+import requests
+import subprocess
 import sys
 import zipfile
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QMessageBox
 import webbrowser
-import ctypes
-import sys
-import pyaudio
 
-import requests
 
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
+class WindowsAudioManager:
+    VOICEMEETER_URL = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v1088.zip"
+    DOWNLOAD_PATH = "VoicemeeterSetup.zip"
+    EXTRACTION_PATH = "Voicemeeter_Installation"
+
+    @staticmethod
+    def is_admin():
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+    @staticmethod
+    def is_voicemeeter_installed():
+        import winreg
+        try:
+            registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\VoiceMeeter_Key"
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path, 0, winreg.KEY_READ):
+                return True
+        except FileNotFoundError:
+            return False
+
+    def run_as_admin(self, argv=None, debug=False):
+        if argv is None:
+            argv = sys.argv
+
+        argument_line = ' '.join(argv[1:])
+        executable = sys.executable
+        if debug:
+            print("Command line: ", executable, argument_line)
+
+        ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, argument_line, None, 1)
+        return int(ret) > 32
+
+    def install_voicemeeter(self):
+        if not self.is_admin():
+            self.run_as_admin()
+        else:
+            response = requests.get(self.VOICEMEETER_URL)
+            with open(self.DOWNLOAD_PATH, 'wb') as file:
+                file.write(response.content)
+
+            with zipfile.ZipFile(self.DOWNLOAD_PATH, 'r') as zip_ref:
+                zip_ref.extractall(self.EXTRACTION_PATH)
+            
+            installer_path = os.path.join(self.EXTRACTION_PATH, "VoicemeeterSetup.exe")
+            subprocess.run(installer_path, shell=True)
+            
+    def prompt_for_default_device_setting(self):
+        QMessageBox.warning(None, "Configure Recording Device", 
+                            "VoiceMeeter is not set as the default recording device. "
+                            "Please open Sound Settings and set it as the default device.",
+                            QMessageBox.Ok)
+        webbrowser.open("ms-settings:sound")
+
+    def configure_voicemeeter(self):
+        instructions = (
+            "Set Voicemeeter as the Default Recording Device:\n"
+            "1. Right-click on the sound icon in your system tray and select 'Sounds'.\n"
+            "2. Go to the 'Recording' tab.\n"
+            "3. Find Voicemeeter Output, right-click on it, and set it as the default device.\n\n"
+            "Configure Voicemeeter:\n"
+            "1. Open Voicemeeter.\n"
+            "2. For the hardware input, select your microphone.\n"
+            "3. For the hardware out, select your main speakers or headphones.\n"
+            "4. Adjust the input and output levels to avoid feedback or distortion.\n\n"
+            "Routing Audio from Speakers to Microphone:\n"
+            "1. In Voicemeeter, route your microphone to one of the virtual outputs (B1 or B2).\n"
+            "2. Then, select the same virtual output (B1 or B2) as the input in the application "
+            "where you want the audio to be sent (like a recording software or a communication app).\n\n"
+            "Preventing Playback Through Speakers:\n"
+            "1. To prevent playback through speakers, ensure that the virtual output (B1 or B2) used "
+            "for routing the microphone is not also set as an output on the Voicemeeter.\n\n"
+        )
+        QMessageBox.information(None, "Configure Voicemeeter", instructions)
+
+    def check_voicemeeter_set_as_default(self):
+        pa = pyaudio.PyAudio()
+        try:
+            default_device_index = pa.get_default_input_device_info()['index']
+            device_info = pa.get_device_info_by_index(default_device_index)
+            return "VoiceMeeter" in device_info.get('name')
+        finally:
+            pa.terminate()
+
+    def handle_windows_audio(self):
+        if not self.is_voicemeeter_installed():
+            msgBox = QMessageBox()
+            msgBox.setIcon(QMessageBox.Question)
+            msgBox.setText("Voicemeeter is not installed. Do you want to install it now?")
+            msgBox.setWindowTitle("Install Voicemeeter")
+            msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            if msgBox.exec() == QMessageBox.Yes:
+                self.install_voicemeeter()
+                self.configure_voicemeeter()
+        elif not self.check_voicemeeter_set_as_default():
+            self.prompt_for_default_device_setting()
 
 def setup_logging():
     """Setup the logging configuration."""
     logging.basicConfig(level=logging.INFO)
 
-def is_voicemeeter_installed():
-    import winreg
-    try:
-        registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\VoiceMeeter_Key"
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path, 0, winreg.KEY_READ):
-            return True
-    except FileNotFoundError:
-        return False
-    
-def run_as_admin(argv=None, debug=False):
-    shell32 = ctypes.windll.shell32
-    if argv is None and shell32.IsUserAnAdmin():
-        # Already running as admin
-        return True
-
-    if argv is None:
-        argv = sys.argv
-
-    if hasattr(sys, '_MEIPASS'):
-        arguments = map(str, argv[1:])
-    else:
-        arguments = map(str, argv)
-
-    argument_line = u' '.join(arguments)
-    executable = str(sys.executable)
-    if debug:
-        print("Command line: ", executable, argument_line)
-    ret = shell32.ShellExecuteW(None, "runas", executable, argument_line, None, 1)
-    if int(ret) <= 32:
-        return False
-    return None
-
-def install_voicemeeter():
-    msgBox = QMessageBox()
-    msgBox.setIcon(QMessageBox.Question)
-    msgBox.setText("Voicemeeter is not installed. Do you want to install it now?")
-    msgBox.setWindowTitle("Install Voicemeeter")
-    msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-    if msgBox.exec() == QMessageBox.Yes:
-        if not is_admin():
-            run_as_admin()
-        else:
-            # Download and install Voicemeeter
-            voicemeeter_url = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v1088.zip"
-            download_path = "VoicemeeterSetup.zip"
-            extraction_path = "Voicemeeter_Installation"
-
-            response = requests.get(voicemeeter_url)
-            with open(download_path, 'wb') as file:
-                file.write(response.content)
-
-            with zipfile.ZipFile(download_path, 'r') as zip_ref:
-                zip_ref.extractall(extraction_path)
-        
-            # Assuming the installer is an .exe file inside the zip
-            installer_path = os.path.join(extraction_path, "VoicemeeterSetup.exe")
-            subprocess.run(installer_path, shell=True)
-
-def configure_voicemeeter():
-    instructions = (
-    "Set Voicemeeter as the Default Recording Device:\n"
-    "1. Right-click on the sound icon in your system tray and select 'Sounds'.\n"
-    "2. Go to the 'Recording' tab.\n"
-    "3. Find Voicemeeter Output, right-click on it, and set it as the default device.\n\n"
-    "Configure Voicemeeter:\n"
-    "1. Open Voicemeeter.\n"
-    "2. For the hardware input, select your microphone.\n"
-    "3. For the hardware out, select your main speakers or headphones.\n"
-    "4. Adjust the input and output levels to avoid feedback or distortion.\n\n"
-    "Routing Audio from Speakers to Microphone:\n"
-    "1. In Voicemeeter, route your microphone to one of the virtual outputs (B1 or B2).\n"
-    "2. Then, select the same virtual output (B1 or B2) as the input in the application "
-    "where you want the audio to be sent (like a recording software or a communication app).\n\n"
-    "Preventing Playback Through Speakers:\n"
-    "1. To prevent playback through speakers, ensure that the virtual output (B1 or B2) used "
-    "for routing the microphone is not also set as an output on the Voicemeeter.\n\n"
-)
-
-    QMessageBox.information(None, "Configure Voicemeeter", instructions)
-
-def check_voicemeeter_set_as_default():
-    pa = pyaudio.PyAudio()
-    try:
-        default_device_index = pa.get_default_input_device_info()['index']
-        device_info = pa.get_device_info_by_index(default_device_index)
-        return "VoiceMeeter" in device_info.get('name')
-    finally:
-        pa.terminate()
-
-def prompt_for_default_device_setting():
-    QMessageBox.warning(None, "Configure Recording Device", 
-                        "VoiceMeeter is not set as the default recording device. "
-                        "Please open Sound Settings and set it as the default device.",
-                        QMessageBox.Ok)
-    webbrowser.open("ms-settings:sound")
-    
-def handle_windows_audio(audio_utils):
-    if not is_voicemeeter_installed():
-        install_voicemeeter()
-        configure_voicemeeter()
-    elif not check_voicemeeter_set_as_default():
-        prompt_for_default_device_setting()
 
 class AudioUtils:
     def __init__(self):
@@ -169,19 +158,40 @@ class AudioUtils:
             return self.search_in_output(r'\* index: \d+.*?name: <(.*?)>', output)
         return None
 
-    def unload_modules(self) -> None:
-        """Unload all tracked modules."""
-        for module_id in self.loaded_modules:
-            self.run_subprocess(["pactl", "unload-module", module_id])
-            logging.info(f"Unloaded module with ID {module_id}")
+    def get_module_ids(self, module_names):
+        """Get the IDs of specific PulseAudio modules."""
+        output = self.run_subprocess(["pactl", "list", "short", "modules"])
+        if output:
+            module_ids = []
+            for line in output.splitlines():
+                parts = line.split()
+                module_id, module_name = parts[0], parts[1]
+                if module_name in module_names:
+                    module_ids.append(module_id)
+            return module_ids
+        return []
+
+    def unload_modules(self, module_ids):
+        """Unload PulseAudio modules."""
+        if len(module_ids) > 0:
+            for module_id in module_ids:
+                try:
+                    self.run_subprocess(["pactl", "unload-module", module_id])
+                    logging.info(f"Unloaded module with ID {module_id}")
+                except Exception as e:
+                    logging.info(f"Failed", e)
+
 
     def setup_virtual_source(self) -> None:
         """Sets up a virtual source combining system output and microphone."""
+        module_ids = self.get_module_ids(["module-null-sink", "module-loopback"])
+        if len(module_ids) > 0:
+            self.unload_modules(module_ids)
+        
         default_sink_monitor = self.get_default_sink_monitor()
         default_source = self.get_default_source()
 
         if default_sink_monitor and default_source:
-            logging.info(f"Default sink monitor: {default_sink_monitor}, Default source: {default_source}")
             self.load_module("module-null-sink", "sink_name=virtual_sink")
             self.load_module("module-loopback", f"sink=virtual_sink source={default_source}")
             self.load_module("module-loopback", f"sink=virtual_sink source={default_sink_monitor}")
@@ -192,16 +202,16 @@ class AudioUtils:
 def audio_setup():
     """Set up the audio based on the operating system."""
     os_name = platform.system()
-    app = QApplication(sys.argv)
     audio_utils = AudioUtils()
-
     if os_name == "Linux":
         audio_utils.setup_virtual_source()
+        try:
+            atexit.register(audio_utils.unload_modules(audio_utils.loaded_modules))
+        except Exception as e:
+            print("Failed to unload some modules", e)
     elif os_name == "Windows":
-        handle_windows_audio(audio_utils)
-
-    atexit.register(audio_utils.unload_modules)
-
+        audio_utils.handle_windows_audio()
+        
 if __name__ == "__main__":
     setup_logging()
     audio_setup()
