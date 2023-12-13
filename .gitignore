@@ -5,3 +5,4 @@ Whisper/*
 recordings
 *.mp3
 token.json
+creds.json

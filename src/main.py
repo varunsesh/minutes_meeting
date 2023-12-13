@@ -8,9 +8,9 @@ from PyQt5.QtGui import QIcon
 if __name__ == "__main__":
     print("Starting the recorder app...")
     try :
+        app = QApplication(sys.argv)
         audio_setup()
         recorder = VoiceRecorder() 
-        app = QApplication(sys.argv)
         main_window = TranscriptionApp(recorder)
         main_window.setWindowTitle('Mr Minutes')
         main_window.setGeometry(100, 100, 800, 600)

@@ -28,11 +28,25 @@ class WindowsAudioManager:
     @staticmethod
     def is_voicemeeter_installed():
         import winreg
+        app_name="voicemeeter"
+        paths = [r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"]
         try:
-            registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\VoiceMeeter_Key"
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path, 0, winreg.KEY_READ):
-                return True
-        except FileNotFoundError:
+            for path in paths:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as key:
+                    for i in range(0, winreg.QueryInfoKey(key)[0]):
+                        skey_name = winreg.EnumKey(key, i)
+                        skey = winreg.OpenKey(key, skey_name)
+                        try:
+                            name, _ = winreg.QueryValueEx(skey, "DisplayName")
+                            if app_name.lower() in name.lower():
+                                return True
+                        except OSError:
+                            pass
+                        finally:
+                            skey.Close()
+            return False
+        except PermissionError:
+            print("Permission Denied. Run as Administrator.")
             return False
 
     def run_as_admin(self, argv=None, debug=False):
@@ -210,7 +224,9 @@ def audio_setup():
         except Exception as e:
             print("Failed to unload some modules", e)
     elif os_name == "Windows":
-        audio_utils.handle_windows_audio()
+        print("windows")
+        win_audio = WindowsAudioManager()
+        win_audio.handle_windows_audio()
         
 if __name__ == "__main__":
     setup_logging()

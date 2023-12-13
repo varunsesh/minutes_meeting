@@ -26,7 +26,7 @@ class GoogleDocsManager:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file('/home/manu/Downloads/creds.json', SCOPES)
+                flow = InstalledAppFlow.from_client_secrets_file('../creds.json', SCOPES)
                 creds = flow.run_local_server(port=0)
             
             # Save the credentials for future use
