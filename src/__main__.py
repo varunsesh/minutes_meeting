@@ -2,6 +2,7 @@ from src import transcribe , voice_recorder, audio_utils
 import sys
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon
+from dotenv import load_dotenv
 
 def main():
     """
@@ -9,6 +10,7 @@ def main():
     """
     print("Starting the recorder app...")
     try :
+        load_dotenv()
         app = QApplication(sys.argv)
         audio_utils.audio_setup()
         recorder = voice_recorder.VoiceRecorder() 

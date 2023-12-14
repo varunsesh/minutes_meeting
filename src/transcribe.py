@@ -3,7 +3,6 @@ import os
 from openai import OpenAI
 from datetime import datetime
 from openai import OpenAI 
-from dotenv import load_dotenv
 from src.google_docs_manager import GoogleDocsManager
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog
 
@@ -19,7 +18,6 @@ class TranscriptionApp(QMainWindow):
         self.initUI()
 
     def initialize_openai_client(self):
-        load_dotenv()
         return OpenAI()
     
     def initUI(self):
@@ -167,11 +165,9 @@ class TranscriptionApp(QMainWindow):
         now = datetime.now()
         formatted_date = now.strftime("%B %d, %Y")
         doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
-        google_doc_id = os.environ.get("GOOGLE_DOC_ID")
-
         segments = self.split_transcript()
         summary = self.process_and_summarize(segments)
-        self.google_docs_manager.save_and_update_docx_on_drive(summary, doc_name, formatted_date, google_doc_id)
+        self.google_docs_manager.save_and_update_docx_on_drive(summary, doc_name, formatted_date)
         self.create_summary_audio(summary)
 
     
