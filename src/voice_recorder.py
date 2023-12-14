@@ -1,3 +1,4 @@
+import sys
 import pyaudio
 import wave
 from pydub import AudioSegment
@@ -45,7 +46,12 @@ class VoiceRecorder:
         return self._transcribe_audio()
 
     def _save_audio(self):
-        recordings_folder = os.path.join(os.path.dirname(__file__), '..', 'recordings')
+        if getattr(sys, 'frozen', False):
+            # The application is frozen (packaged)
+            recordings_folder = os.path.join(os.path.dirname(sys.executable),  "..", "recordings")
+        else:
+            # The application is not frozen (running from source)
+            recordings_folder = os.path.join(os.path.dirname(__file__), "..", "recordings")
         os.makedirs(recordings_folder, exist_ok=True)
 
         # Format file names with the path to the 'Recordings' folder

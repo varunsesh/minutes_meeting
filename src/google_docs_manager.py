@@ -17,7 +17,7 @@ class GoogleDocsManager:
         creds = None
 
         # Load existing credentials from a file
-        token_file_path = os.path.join(os.path.dirname(__file__), '..', 'token.json')
+        token_file_path = os.path.join(os.path.dirname(__file__), 'config/token.json')
         if os.path.exists(token_file_path):
             creds = Credentials.from_authorized_user_file(token_file_path, SCOPES)
 
@@ -26,7 +26,7 @@ class GoogleDocsManager:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file('../creds.json', SCOPES)
+                flow = InstalledAppFlow.from_client_secrets_file(os.path.join(os.path.dirname(__file__), 'config/creds.json'), SCOPES)
                 creds = flow.run_local_server(port=0)
             
             # Save the credentials for future use

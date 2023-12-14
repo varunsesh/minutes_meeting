@@ -1,23 +1,26 @@
-from transcribe import TranscriptionApp 
-from voice_recorder import VoiceRecorder
-from audio_utils import audio_setup
+from src import transcribe , voice_recorder, audio_utils
 import sys
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon
 
-if __name__ == "__main__":
+def main():
+    """
+    This function initializes the main window of the application.
+    """
     print("Starting the recorder app...")
     try :
         app = QApplication(sys.argv)
-        audio_setup()
-        recorder = VoiceRecorder() 
-        main_window = TranscriptionApp(recorder)
+        audio_utils.audio_setup()
+        recorder = voice_recorder.VoiceRecorder() 
+        main_window = transcribe.TranscriptionApp(recorder)
         main_window.setWindowTitle('Mr Minutes')
         main_window.setGeometry(100, 100, 800, 600)
-        main_window.setWindowIcon(QIcon('app_icon.ico'))
+        main_window.setWindowIcon(QIcon('assets/app_icon.ico'))
         main_window.show()
         sys.exit(app.exec_())
     except Exception as e :
         print("Exception Failed to initialize application", e)
 
     
+if __name__ == "__main__":
+    main()

@@ -17,6 +17,7 @@ class WindowsAudioManager:
     VOICEMEETER_URL = "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v1088.zip"
     DOWNLOAD_PATH = "VoicemeeterSetup.zip"
     EXTRACTION_PATH = "Voicemeeter_Installation"
+    VOICEMEETER_CONFIG_PATH = os.path.join(os.path.expanduser('~'), 'Documents/Voicemeeter')
 
     @staticmethod
     def is_admin():
@@ -74,34 +75,31 @@ class WindowsAudioManager:
             
             installer_path = os.path.join(self.EXTRACTION_PATH, "VoicemeeterSetup.exe")
             subprocess.run(installer_path, shell=True)
+    
+    def configure_voicemeeter(self):
+        import shutil
+        config_path = os.path.join(self.VOICEMEETER_CONFIG_PATH, 'VoicemeeterStandard_LastSettings.xml')
+
+        if not os.path.exists(self.VOICEMEETER_CONFIG_PATH):
+            os.makedirs(self.VOICEMEETER_CONFIG_PATH)
+        shutil.copy("config/VoicemeeterStandard_LastSettings.xml", config_path)
+        print(f"Voicemeeter Configured Successfully")
+
             
     def prompt_for_default_device_setting(self):
-        QMessageBox.warning(None, "Configure Recording Device", 
-                            "VoiceMeeter is not set as the default recording device. "
-                            "Please open Sound Settings and set it as the default device.",
-                            QMessageBox.Ok)
-        webbrowser.open("ms-settings:sound")
-
-    def configure_voicemeeter(self):
         instructions = (
-            "Set Voicemeeter as the Default Recording Device:\n"
-            "1. Right-click on the sound icon in your system tray and select 'Sounds'.\n"
-            "2. Go to the 'Recording' tab.\n"
-            "3. Find Voicemeeter Output, right-click on it, and set it as the default device.\n\n"
-            "Configure Voicemeeter:\n"
-            "1. Open Voicemeeter.\n"
-            "2. For the hardware input, select your microphone.\n"
-            "3. For the hardware out, select your main speakers or headphones.\n"
-            "4. Adjust the input and output levels to avoid feedback or distortion.\n\n"
-            "Routing Audio from Speakers to Microphone:\n"
-            "1. In Voicemeeter, route your microphone to one of the virtual outputs (B1 or B2).\n"
-            "2. Then, select the same virtual output (B1 or B2) as the input in the application "
-            "where you want the audio to be sent (like a recording software or a communication app).\n\n"
-            "Preventing Playback Through Speakers:\n"
-            "1. To prevent playback through speakers, ensure that the virtual output (B1 or B2) used "
-            "for routing the microphone is not also set as an output on the Voicemeeter.\n\n"
+            "Setting Up Voicemeeter as Default Recording Device:\n"
+            "1. Open 'Sounds'.\n"
+            "2. Navigate to the 'Recording' tab.\n"
+            "3. Locate 'Voicemeeter Output', right-click it, and select 'Set as Default Device'.\n\n"
+            "Configuring Voicemeeter Settings:\n"
+            "1. Launch Voicemeeter.\n"
+            "2. Click on Menu and Check System Tray and Run on Windows Startup.\n"
+            "4. Assign Voicemeeter as your primary microphone and retain the system speakers as the default output device.\n"
+            f"5. If you face any issues with recording just load the configuration file from {self.VOICEMEETER_CONFIG_PATH}.\n"
         )
-        QMessageBox.information(None, "Configure Voicemeeter", instructions)
+        QMessageBox.information(None, "Configure Recording Device", instructions, QMessageBox.Ok)
+        webbrowser.open("ms-settings:sound")
 
     def check_voicemeeter_set_as_default(self):
         pa = pyaudio.PyAudio()
@@ -122,6 +120,7 @@ class WindowsAudioManager:
             if msgBox.exec() == QMessageBox.Yes:
                 self.install_voicemeeter()
                 self.configure_voicemeeter()
+
         elif not self.check_voicemeeter_set_as_default():
             self.prompt_for_default_device_setting()
 
@@ -130,9 +129,7 @@ def setup_logging():
     logging.basicConfig(level=logging.INFO)
 
 
-class AudioUtils:
-    def __init__(self):
-        self.loaded_modules = []
+class LinuxAudioManager:
 
     def run_subprocess(self, command: list) -> str:
         """Run a subprocess command and return its output as a string."""
@@ -146,10 +143,7 @@ class AudioUtils:
     def load_module(self, module_name: str, args: str = "") -> None:
         """Load a PulseAudio module and track it."""
         command = f"pactl load-module {module_name} {args}".split()
-        module_id = self.run_subprocess(command)
-        if module_id:
-            self.loaded_modules.append(module_id)
-            logging.info(f"Loaded module {module_name} with ID {module_id}")
+        self.run_subprocess(command)
 
     def search_in_output(self, pattern: str, output: str) -> str:
         """Search for a pattern in the provided output and return the first matching group."""
@@ -199,6 +193,7 @@ class AudioUtils:
     def setup_virtual_source(self) -> None:
         """Sets up a virtual source combining system output and microphone."""
         module_ids = self.get_module_ids(["module-null-sink", "module-loopback"])
+        # clean up any null-sinks
         if len(module_ids) > 0:
             self.unload_modules(module_ids)
         
@@ -216,15 +211,12 @@ class AudioUtils:
 def audio_setup():
     """Set up the audio based on the operating system."""
     os_name = platform.system()
-    audio_utils = AudioUtils()
+    
     if os_name == "Linux":
-        audio_utils.setup_virtual_source()
-        try:
-            atexit.register(audio_utils.unload_modules(audio_utils.loaded_modules))
-        except Exception as e:
-            print("Failed to unload some modules", e)
+        linux_audio = LinuxAudioManager()
+        linux_audio.setup_virtual_source()
+    
     elif os_name == "Windows":
-        print("windows")
         win_audio = WindowsAudioManager()
         win_audio.handle_windows_audio()
         

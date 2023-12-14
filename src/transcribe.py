@@ -4,7 +4,7 @@ from openai import OpenAI
 from datetime import datetime
 from openai import OpenAI 
 from dotenv import load_dotenv
-from google_docs_manager import GoogleDocsManager
+from src.google_docs_manager import GoogleDocsManager
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog
 
 options = QFileDialog.Options()
