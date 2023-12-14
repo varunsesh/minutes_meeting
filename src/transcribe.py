@@ -3,17 +3,17 @@ import os
 from openai import OpenAI
 from datetime import datetime
 from openai import OpenAI 
-from src.google_docs_manager import GoogleDocsManager
+from src.voice_recorder import VoiceRecorder
+from src.google_api_manager import GoogleAPIManager
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog
 
 options = QFileDialog.Options()
 options |= QFileDialog.DontUseNativeDialog
 
 class TranscriptionApp(QMainWindow):
-    def __init__(self, voice_recorder):
+    def __init__(self, voice_recorder:VoiceRecorder):
         super().__init__()
         self.voice_recorder = voice_recorder
-        self.google_docs_manager = GoogleDocsManager()
         self.client = self.initialize_openai_client()
         self.initUI()
 
@@ -163,11 +163,12 @@ class TranscriptionApp(QMainWindow):
 
     def create_minutes(self):
         now = datetime.now()
+        gsm = GoogleAPIManager()
         formatted_date = now.strftime("%B %d, %Y")
         doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
         segments = self.split_transcript()
         summary = self.process_and_summarize(segments)
-        self.google_docs_manager.save_and_update_docx_on_drive(summary, doc_name, formatted_date)
+        gsm.update_docx_on_drive(summary, doc_name, formatted_date)
         self.create_summary_audio(summary)
 
     

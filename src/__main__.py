@@ -13,7 +13,7 @@ def main():
         load_dotenv()
         app = QApplication(sys.argv)
         audio_utils.audio_setup()
-        recorder = voice_recorder.VoiceRecorder() 
+        recorder = voice_recorder.VoiceRecorder()
         main_window = transcribe.TranscriptionApp(recorder)
         main_window.setWindowTitle('Mr Minutes')
         main_window.setGeometry(100, 100, 800, 600)
