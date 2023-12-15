@@ -1,4 +1,3 @@
-import atexit
 import ctypes
 import logging
 import os
@@ -21,6 +20,12 @@ class WindowsAudioManager:
 
     @staticmethod
     def is_admin():
+        """
+        Check if the current user is an administrator on the system.
+
+        Returns:
+            True if the current user is an administrator, False otherwise.
+        """
         try:
             return ctypes.windll.shell32.IsUserAnAdmin()
         except:
@@ -28,6 +33,12 @@ class WindowsAudioManager:
 
     @staticmethod
     def is_voicemeeter_installed():
+        """
+        Check if the current user is an administrator on the system.
+
+        Returns:
+            True if the current user is an administrator, False otherwise.
+        """
         import winreg
         app_name="voicemeeter"
         paths = [r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"]
@@ -42,12 +53,12 @@ class WindowsAudioManager:
                             if app_name.lower() in name.lower():
                                 return True
                         except OSError:
-                            pass
+                            logging.error('OSError')
                         finally:
                             skey.Close()
             return False
         except PermissionError:
-            print("Permission Denied. Run as Administrator.")
+            logging.error("Permission Denied. Run as Administrator.")
             return False
 
     def run_as_admin(self, argv=None, debug=False):
@@ -57,7 +68,7 @@ class WindowsAudioManager:
         argument_line = ' '.join(argv[1:])
         executable = sys.executable
         if debug:
-            print("Command line: ", executable, argument_line)
+            logging.info("Command line: ", executable, argument_line)
 
         ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, argument_line, None, 1)
         return int(ret) > 32
@@ -83,7 +94,7 @@ class WindowsAudioManager:
         if not os.path.exists(self.VOICEMEETER_CONFIG_PATH):
             os.makedirs(self.VOICEMEETER_CONFIG_PATH)
         shutil.copy("config/VoicemeeterStandard_LastSettings.xml", config_path)
-        print(f"Voicemeeter Configured Successfully")
+        logging.info(f"Voicemeeter Configured Successfully")
 
             
     def prompt_for_default_device_setting(self):
@@ -124,10 +135,6 @@ class WindowsAudioManager:
         elif not self.check_voicemeeter_set_as_default():
             self.prompt_for_default_device_setting()
 
-def setup_logging():
-    """Setup the logging configuration."""
-    logging.basicConfig(level=logging.INFO)
-
 
 class LinuxAudioManager:
 
@@ -139,6 +146,8 @@ class LinuxAudioManager:
         except subprocess.CalledProcessError as e:
             logging.error(f"Subprocess error: {e}")
             return None
+        except Exception as e:
+            logging.info(f"Pulse Audio errors: {e}")
 
     def load_module(self, module_name: str, args: str = "") -> None:
         """Load a PulseAudio module and track it."""
@@ -221,5 +230,4 @@ def audio_setup():
         win_audio.handle_windows_audio()
         
 if __name__ == "__main__":
-    setup_logging()
     audio_setup()
