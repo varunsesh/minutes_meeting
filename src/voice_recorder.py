@@ -15,14 +15,14 @@ class VoiceRecorder:
     The VoiceRecorder class provides an interface for recording and transcribing audio.
     """
     def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.is_active = False
         self.audio_frames = []
         self.pyaudio_instance = pyaudio.PyAudio()
         self.channel = pygame.mixer.find_channel(True)
         self.recording_thread = None
         self.audio_stream = None
-        self.logger = logging.getLogger(self.__class__.__name__)
-
+        
     def begin_recording(self):
         """Starts recording audio using PyAudio."""
         self.is_active = True

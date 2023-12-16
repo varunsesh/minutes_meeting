@@ -1,6 +1,9 @@
+import logging, torch
+from threading import Thread
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QPushButton, QFileDialog, QVBoxLayout, QWidget, QHBoxLayout
 from PyQt5.QtGui import QIcon
-from src import voice_recorder as vr , transcribe as tr
+from src import voice_recorder as vr , transcribe as tr, google_api_manager as gam
+import whisper
 
 options = QFileDialog.Options()
 options |= QFileDialog.DontUseNativeDialog
@@ -8,9 +11,31 @@ options |= QFileDialog.DontUseNativeDialog
 class UIManager(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.model = None
+        self.logger = logging.getLogger(self.__class__.__name__)
+        gam.GoogleAPIManager().authenticate()
         self.voice_recorder = vr.VoiceRecorder()
-        self.transcribe = tr.CreateTranscription(self.update_transcription_display)
+        model_loading_thread = Thread(target=self.load_model, daemon=True)
+        model_loading_thread.start()
+        while not self.model:
+            pass
+        self.transcribe = tr.TranscriptionManager(self.model, self.update_transcription_display)
         self.initUI()
+
+    def load_model(self):
+        """
+        load the model on a seperate Thread. Check if CUDA is available and load model accordingly.
+        """
+        cuda_available = torch.cuda.is_available()
+
+        if cuda_available:
+            self.logger.info("CUDA is available. GPU support is enabled.")
+            self.logger.info("Loading Medium whisper model")
+            self.model = whisper.load_model("large")
+        else:
+            self.logger.info("CUDA is not available. GPU support is disabled. Loading Tiny whisper model")
+            self.model = whisper.load_model("tiny")
+            
 
     def initUI(self):
         """
@@ -94,8 +119,11 @@ class UIManager(QMainWindow):
         Args:
             transcription (str): The transcription to display in the transcription display.
         """
-        self.transcription_display.clear()
-        self.transcription_display.setText(transcription)
+        if transcription :
+            self.transcription_display.clear()
+            self.transcription_display.setText(transcription)
+        else :
+            self.logger.info("Transcription display could not be updated")
     
     def load_audio_file(self):
         """
@@ -107,8 +135,7 @@ class UIManager(QMainWindow):
         file_name,_ = QFileDialog.getOpenFileName(self, "Select Audio File", "", "Audio Files (*.mp3 *.wav)", options=options)
         if file_name:
             self.transcribe.mp3_file_name = file_name  # Assuming VoiceRecorder can handle external file paths
-            self.transcribe.transcription = self.transcribe.transcribe_audio()
-            self.update_transcription_display(self.transcribe.transcription)
+            self.transcribe.create_transcript()
 
     def load_transcript(self):
         """

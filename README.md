@@ -7,6 +7,7 @@ Record meeting using Whisper and generate minutes using OpenAI APIs.
 3. [Configuration](#configuration)
 4. [Usage](#usage)
 5. [Build Instructions](#build-instructions)
+6. [Logging](#logging)
 
 ## Setup
 
@@ -76,7 +77,19 @@ Ensure all dependencies are installed as per the 'requirements.txt'.
     ```
     pyinstaller --add-data=".env;." --add-data="src\config;src\config" --add-data="src\assets;src\assets" --collect-all="whisper" --collect-all="nvidia" cli.py
     ```
+## Logging
 
+All log messages are logged to logs/Minutes.log
+
+If you want to see logs in console then uncomment part of code in __main.py__.
+ 
+ ```    # console handler to print the logs
+        # console_handler = logging.StreamHandler()
+        # console_handler.setLevel(logging.INFO)
+        # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        # console_handler.setFormatter(formatter)
+        # logging.getLogger('').addHandler(console_handler)
+ ```
 
 
 

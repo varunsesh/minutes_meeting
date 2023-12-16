@@ -1,52 +1,49 @@
 import logging
 import os, sys
-from threading import Thread
-from openai import OpenAI
 from datetime import datetime
 from openai import OpenAI
 from src.google_api_manager import GoogleAPIManager
-import whisper
+from whisper import Whisper
 
-class CreateTranscription():
-    def __init__(self, update_ui_callback=None):
-        self.client = self.initialize_openai_client()
+class TranscriptionManager():
+    def __init__(self, whisper_model: Whisper, update_ui_callback):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.client = self.init_openai_client()
         self.transcription = ""
         self.mp3_file_name = ""
-        self.model = None
-        model_loading_thread = Thread(target=self.load_model, daemon=True)
-        model_loading_thread.start()
+        self.whisper_model = whisper_model
         self.update_ui_callback = update_ui_callback
-
-    def initialize_openai_client(self):
-        return OpenAI()
+        self.conversation_history = []
     
-    def load_model(self):
-        """
-        load the model on a seperate Thread .
-        """
-        self.model = whisper.load_model("medium")
-        # Model loading logic
-        print("Model is loading...")
+    def init_openai_client(self):
+        hasKey = os.environ.get("OPENAI_API_KEY")
+        if hasKey:
+            self.client = OpenAI()
+        else:
+            # prompt_and_get_openai_key
+            # self.client = OpenAI(api_key:openai_key)
+            self.logger.warning("Missing OpenAI key")
 
 
     def create_transcript(self):
         """
         This function is used to transcribe an audio file into text. If an audio file is not loaded, the function will display an error message. If an audio file is loaded, the function will use the VoiceRecorder class to transcribe the audio file and display the transcription in the transcription display.
         """
-        logging.info(f"Creating transcript of {self.mp3_file_name}")
-        if self.mp3_file_name:
-            transcription_result = self.model.transcribe(self.mp3_file_name)
-            self.transcription = transcription_result["text"]
-            self.update_ui_callback(self.transcription)
-        else:
-            # Handle case where no audio file is loaded
+        self.logger.info(f"Creating transcript of {self.mp3_file_name}")
+        if not self.mp3_file_name:
+            self.logger.error("No audio file loaded for transcription.")
             self.update_ui_callback("No audio file loaded for transcription.")
+            return
 
-    def split_transcript(self, max_length=7000):
+        transcription_result = self.whisper_model.transcribe(self.mp3_file_name)
+        self.transcription = transcription_result["text"]
+        self.update_ui_callback(self.transcription)
+
+    def split_transcript(self, max_length=16000):
         """
         Splits the transcript into segments of a given maximum length.
 
-        Args:  max_length (int, optional): The maximum length of each segment. Defaults to 7000.
+        Args:  max_length (int, optional): The maximum length of each segment. Defaults to 16000.
 
         Returns:
             list: A list of segments.
@@ -58,36 +55,60 @@ class CreateTranscription():
                 segment = transcription[:max_length].rsplit(' ', 1)[0]
                 segments.append(segment)
                 transcription = transcription[len(segment):].lstrip()
-        else:
+        elif len(transcription) > 0:
             segments.append(transcription)
         
         return segments
 
+    def update_conversation_history(self, system_message, user_message):
+        """
+        Update the conversation history.
+        """
+        self.conversation_history.extend([
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ])
+    
     def gpt_request(self, segment, is_final_segment):
         """
-        This function is used to generate a summary for the GPT-4 model.
-
-        Args:
-            segment (str): The segment of the transcript to use as input for the prompt.
-            is_final_segment (bool): A boolean indicating whether the given segment is the final segment of the transcript.
-
-        Returns:
-            str: The generated summary from the GPT-4 model.
+        Send a request to GPT-4 to process a segment of a meeting transcript.
+        If it is the final segment, also request a summary with objective, key points, and action items.
         """
-        instruction = (
-            "Please carefully read the following segment of a meeting transcript. Pay close attention to the details, as they will be important for a summary you'll be asked to provide later. However, do not start summarizing until you receive a specific request to do so"
-        )
-        prompt = f"{instruction}\n\n{segment}"
-       
+        instruction = "Carefully review the segment provided from a meeting transcript, ensuring you pay close attention to all details. Be aware of the total word count of the entire transcript. Upon receipt of this content, simply acknowledge its reception."
+
+        # Process the segment
+        segment_response = self.create_gpt_response(instruction, segment)
+        self.logger.info(segment_response)
+        
         if is_final_segment:
-            prompt += "Now, provide the objective, key points and (action items or tasks) based on the entire transcript, ensuring the content does not exceed half the length of original content in terms of character count."
-            response = self.client.chat.completions.create(
-            model="gpt-4",
+            summary_responses = self.get_meeting_summary()
+            return summary_responses
+        return None
+
+    def create_gpt_response(self, system_message, user_message):
+        """
+        Create a response from GPT-4 based on the given instruction and user content.
+        """
+        self.update_conversation_history(system_message, user_message)
+        
+        response = self.client.chat.completions.create(
+            model="gpt-4-1106-preview",
             temperature=0.7,
-            messages=[{"role": "system", "content": prompt}]
+            messages=self.conversation_history
         )
-            return response.choices[0].message.content
-        return
+        return response.choices[0].message.content
+
+    def get_meeting_summary(self):
+        """
+        Get a summary of the meeting including objective, key points, and action items.
+        """
+        
+        summary = self.create_gpt_response('Total combined word count of objective, key points and action items should be less than half of the word count of original transcript.'
+                                           ' Ensure clarity and presentation quality in the sentence formation. The summary should be structured as follows: '
+                                           '{"objective": "Brief paragraph on the meeting objective", "key_points": ["1. Key point..", "2. Key point 2", ...],"action_items": ["1. Action item", "2. Action item", ...]}' , 
+                                           'Now Provide a summary of the meeting transcript')
+        
+        return summary
 
     def process_and_summarize(self, segments):
         """
@@ -95,41 +116,40 @@ class CreateTranscription():
 
         Args:
             segments (list): A list of segments as prompts"""
-        return [self.gpt_request(segment, i == len(segments) - 1) for i, segment in enumerate(segments)]
+        return [self.gpt_request(segment,  i == len(segments) - 1) for i, segment in enumerate(segments)]
+        
 
 
     def create_summary_audio(self, summary):
             
         meeting_summary = os.path.join(os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.dirname(__file__)),  "..", "meeting_summary.mp3")
 
+        summary_text = f"{summary['objective']}. Key Points disscussed were {summary['key_points']}. Tasks that were pending {summary['action_items']}. Alright, it's time for me to switch gears from talk mode to stalk mode. I'm now entering record mode to capture today's discussion!"    
+        
         response = self.client.audio.speech.create(
             model="tts-1",
             voice="onyx",
-            input=f"{summary}.Alright, it's time for me to switch gears from talk mode to stalk mode. I'm now entering record mode to capture today's discussion!"
+            input=summary_text
         )
         response.stream_to_file(meeting_summary)
 
     def create_minutes(self):
-        """
-        This function is used to generate minutes for a meeting based on the recorded audio and transcript.
-
-        The following steps are performed:
-
-        1. The recorded audio is transcribed using the OpenAI API.
-        2. The transcript is split into segments of a maximum length of 7000 characters.
-        3. For each segment, a summary is generated using the GPT-4 model.
-        4. The summaries are combined into a single document.
-        5. The document is uploaded to Google Drive using the Google API.
-        6. An audio summary of the meeting is generated using the OpenAI API and uploaded to Google Drive.
-
-        """
+        """Generate minutes for a meeting."""
         now = datetime.now()
         gsm = GoogleAPIManager()
         formatted_date = now.strftime("%B %d, %Y")
         doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
         segments = self.split_transcript()
-        summary = self.process_and_summarize(segments)
-        gsm.update_docx_on_drive(summary, doc_name, formatted_date)
-        self.create_summary_audio(summary)
+        # summary = self.process_and_summarize(segments)[0]
+        # try:
+        #     summary = json.loads(summary)
+        # except Exception as e:
+        #     self.logger.error(f"Error {e}")
+        summary = "Update the Google Doc with the given summary, local file name, and date. param summary: The summary to add to the Google Doc (list of strings)"
+        "param local_fname: The local temp file name of the Word document :param date: The date to add to the Google Doc The updated Google Doc ID"
+        if summary:
+            self.conversation_history = []
+            gsm.update_docx_on_drive(summary, doc_name, formatted_date)
+            self.create_summary_audio(summary)
 
     

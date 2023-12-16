@@ -16,11 +16,12 @@ class GoogleAPIManager:
         Initialize the Google API Manager.
         :return: None
         """
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.SCOPES = ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/drive']
         self.credentials_file = os.path.join(os.path.dirname(__file__), 'config/creds.json')
         self.creds = None
         self.authenticate()
-        self.doc_id = self.get_google_doc_id()
+        self.doc_id = None
 
     def authenticate(self):
         """Authenticate with Google and set up the services.
@@ -34,7 +35,7 @@ class GoogleAPIManager:
         if not self.creds or not self.creds.valid:
             
             if self.creds and self.creds.expired and self.creds.refresh_token:    
-                logging.info('Refreshing token')
+                self.logger.info('Refreshing token')
                 self.creds.refresh(Request())
             
             else:
@@ -43,32 +44,31 @@ class GoogleAPIManager:
             
             with open(token_path, 'w') as token:    
                 token.write(self.creds.to_json())
-                logging.info('Token generated successfully')
+                self.logger.info('Token generated successfully')
 
         self.calendar_service = build('calendar', 'v3', credentials=self.creds)
         self.drive_service = build('drive', 'v3', credentials=self.creds)
     
     def get_google_doc_id(self):
-            """
-            Get the Google Doc ID from the environment variable or prompt the user for it.
-
-            :return: The Google Doc ID
-            """
-            doc_id = os.environ.get("GOOGLE_DOC_ID")
-            if not doc_id:
-                text, ok = QInputDialog.getText(None, 'Google Docs ID', 'Enter Google Docs link or ID:')
-                if ok and text:
-                    # Extract ID from link or use the provided ID
-                    match = re.search(r"/d/([a-zA-Z0-9-_]+)", text)
-                    if match:
-                        doc_id = match.group(1)
-                    else:
-                        doc_id = text
-            
-            logging.info("Got Google Docs Id", doc_id)
-            
-            return doc_id
+        """Get the Google Doc ID from the user or environment variable."""
+        doc_id = os.environ.get("GOOGLE_DOC_ID")
+        if not doc_id:
+            doc_id = self.prompt_for_google_doc_id()
+        self.logger.info(f"Google Docs Id: {doc_id}")
+        return doc_id
     
+    def prompt_for_google_doc_id(self):
+        """Prompt the user to input the Google Doc ID."""
+        text, ok = QInputDialog.getText(None, 'Google Docs ID', 'Enter Google Docs link or ID:')
+        if ok and text:
+            return self.extract_id_from_link(text)
+        return None
+    
+    def extract_id_from_link(self, text):
+        """Extract the ID from the Google Docs link."""
+        match = re.search(r"/d/([a-zA-Z0-9-_]+)", text)
+        return match.group(1) if match else text
+
     def download_document(self):
         """
         Download the Google Doc as a Word document.
@@ -82,12 +82,12 @@ class GoogleAPIManager:
         done = False
         while not done:
             status, done = downloader.next_chunk()
-            logging.info("Download status" , status)
+            self.logger.info(f"Download status: {status}")
         
         fh.seek(0)
         return Document(fh)
     
-    def update_docx_on_drive(self, summary, local_fname, date):
+    def update_docx_on_drive(self, summary, local_fname, date) -> str:
         """
         Update the Google Doc with the given summary, local file name, and date.
 
@@ -97,49 +97,41 @@ class GoogleAPIManager:
         :return: The updated Google Doc ID
         """
 
-        logging.info('Downloading copy of Google Doc')
+        self.doc_id = self.get_google_doc_id()
 
-        document = self.download_document()
+        if not self.doc_id:
+            self.logger.info('Downloading copy of Google Doc')
 
-        logging.info('Appending summary to Google Doc')
-        document.add_paragraph("Meeting Notes", style='Heading 1')
-        document.add_paragraph(date, style='Normal')
-        document.add_paragraph("Summary", style='Heading 2')
+            document = self.download_document()
 
-        section = 'summary'
-        key_point_number = 1
-        action_item_number = 1
-        print(type(line))
-        for line in summary:
-            if line.lower() == 'key points':
-                section = 'key points'
-                document.add_paragraph(line, style='Heading 2')
-                continue
-            elif line.lower() == 'action items':
-                section = 'action items'
-                document.add_paragraph(line, style='Heading 2')
-                continue
+            self.logger.info('Appending summary to Google Doc')
+            document.add_paragraph("Meeting Notes", style='Heading 1')
+            document.add_paragraph(date, style='Normal')
             
-            if section == 'summary':
-                document.add_paragraph(line, style='Normal')
-            elif section == 'key points':
-                document.add_paragraph(f"{key_point_number}. {line}", style='List Number')
-                key_point_number += 1
-            elif section == 'action items':
-                document.add_paragraph(f"{action_item_number}. {line}", style='List Number')
-                action_item_number += 1
+            document.add_paragraph("Objective", style='Heading 3')
+            document.add_paragraph(summary["objective"], style ='Normal')
 
-        temp_path = "temp_" + local_fname
-        logging.info('Saving google document to temp file')
-        document.save(temp_path)
+            document.add_paragraph("Key Points", style='Heading 3')
+            for i, item in enumerate(summary["key_points"],1):
+                document.add_paragraph(f'{i}. {item}', style='Normal')
+            
+            document.add_paragraph("Action Items", style='Heading 3')
+            for i, item in enumerate(summary["action_items"],1):
+                document.add_paragraph(f'{i}. {item}', style='Normal')
+            
+            temp_path = "temp_" + local_fname
+            self.logger.info('Saving google document to temp file')
+            document.save(temp_path)
 
-        logging.info('Uploading google document to Cloud')
-        updated_doc_id = self.upload_document(local_fname, temp_path)
+            self.logger.info('Uploading google document to Cloud')
+            updated_doc_id = self.upload_document(local_fname, temp_path)
 
-        # Clean up the temporary local file
-        os.remove(temp_path)
+            # Clean up the temporary local file
+            os.remove(temp_path)
 
-        return updated_doc_id    
+            return updated_doc_id    
+        else: 
+            self.logger.info('Failed to upload google document. document id missing')
 
     def upload_document(self, local_fname, temp_path):  
         """
