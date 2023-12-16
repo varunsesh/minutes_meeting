@@ -112,12 +112,12 @@ class GoogleAPIManager:
             document.add_paragraph(summary["objective"], style ='Normal')
 
             document.add_paragraph("Key Points", style='Heading 3')
-            for i, item in enumerate(summary["key_points"],1):
-                document.add_paragraph(f'{i}. {item}', style='Normal')
+            for item in enumerate(summary["key_points"],1):
+                document.add_paragraph(item, style='Normal')
             
             document.add_paragraph("Action Items", style='Heading 3')
-            for i, item in enumerate(summary["action_items"],1):
-                document.add_paragraph(f'{i}. {item}', style='Normal')
+            for item in enumerate(summary["action_items"],1):
+                document.add_paragraph(item, style='Normal')
             
             temp_path = "temp_" + local_fname
             self.logger.info('Saving google document to temp file')
