@@ -91,34 +91,55 @@ class GoogleAPIManager:
         """
         Update the Google Doc with the given summary, local file name, and date.
 
-        :param summary: The summary to add to the Google Doc
+        :param summary: The summary to add to the Google Doc (list of strings)
         :param local_fname: The local temp file name of the Word document
         :param date: The date to add to the Google Doc
         :return: The updated Google Doc ID
         """
-        
+
         logging.info('Downloading copy of Google Doc')
 
         document = self.download_document()
-        
+
         logging.info('Appending summary to Google Doc')
-        document.add_paragraph("Meeting Minutes", style='Heading 1')
+        document.add_paragraph("Meeting Notes", style='Heading 1')
         document.add_paragraph(date, style='Normal')
-        document.add_paragraph(summary, style='Normal')
-        document.add_paragraph()
-        
+        document.add_paragraph("Summary", style='Heading 2')
+
+        section = 'summary'
+        key_point_number = 1
+        action_item_number = 1
+        print(type(line))
+        for line in summary:
+            if line.lower() == 'key points':
+                section = 'key points'
+                document.add_paragraph(line, style='Heading 2')
+                continue
+            elif line.lower() == 'action items':
+                section = 'action items'
+                document.add_paragraph(line, style='Heading 2')
+                continue
+            
+            if section == 'summary':
+                document.add_paragraph(line, style='Normal')
+            elif section == 'key points':
+                document.add_paragraph(f"{key_point_number}. {line}", style='List Number')
+                key_point_number += 1
+            elif section == 'action items':
+                document.add_paragraph(f"{action_item_number}. {line}", style='List Number')
+                action_item_number += 1
+
         temp_path = "temp_" + local_fname
         logging.info('Saving google document to temp file')
         document.save(temp_path)
-        
+
         logging.info('Uploading google document to Cloud')
         updated_doc_id = self.upload_document(local_fname, temp_path)
 
         # Clean up the temporary local file
         os.remove(temp_path)
 
-        return updated_doc_id
-    
+        return updated_doc_id    
 
     def upload_document(self, local_fname, temp_path):  
         """
