@@ -78,6 +78,7 @@ class CreateTranscription():
             "Please carefully read the following segment of a meeting transcript. Pay close attention to the details, as they will be important for a summary you'll be asked to provide later. However, do not start summarizing until you receive a specific request to do so"
         )
         prompt = f"{instruction}\n\n{segment}"
+       
         if is_final_segment:
             prompt += "Now, provide the objective, key points and (action items or tasks) based on the entire transcript, ensuring the content does not exceed half the length of original content in terms of character count."
             response = self.client.chat.completions.create(
@@ -85,7 +86,8 @@ class CreateTranscription():
             temperature=0.7,
             messages=[{"role": "system", "content": prompt}]
         )
-        return response.choices[0].message.content
+            return response.choices[0].message.content
+        return
 
     def process_and_summarize(self, segments):
         """
