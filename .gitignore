@@ -1,7 +1,26 @@
-Whisper/*
-__pycache__/*
-env/*
-*.mp4
+*__pycache__*
+*.py[cod]
+*$py.class
+*.log
+
+#Environments
 .env
-meeting_minutes.docx
-transcription.txt
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+recordings
+*.mp3
+*.mp4
+#PyInstaller files
+*.manifest
+*.spec
+build
+dist
+
+# GCreds
+token.json
+creds.json
