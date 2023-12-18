@@ -99,32 +99,28 @@ class GoogleAPIManager:
 
         self.doc_id = self.get_google_doc_id()
 
-        if not self.doc_id:
+        if self.doc_id:
             self.logger.info('Downloading copy of Google Doc')
 
             document = self.download_document()
+            try: 
+                self.logger.info('Appending summary to Google Doc')
+                document.add_paragraph("Meeting Notes", style='Heading 1')
+                document.add_paragraph(date, style='Normal')
+                
+                document.add_paragraph("Objective", style='Heading 3')
+                document.add_paragraph(summary["objective"], style ='Normal')
 
-            self.logger.info('Appending summary to Google Doc')
-            document.add_paragraph("Meeting Notes", style='Heading 1')
-            document.add_paragraph(date, style='Normal')
-            
-            document.add_paragraph("Objective", style='Heading 3')
-            document.add_paragraph(summary["objective"], style ='Normal')
+                document.add_paragraph(summary['key_points_and_tasks'], style='Normal')
+                
+                temp_path = "temp_" + local_fname
+                self.logger.info('Saving google document to temp file')
+                document.save(temp_path)
 
-            document.add_paragraph("Key Points", style='Heading 3')
-            for item in enumerate(summary["key_points"],1):
-                document.add_paragraph(item, style='Normal')
-            
-            document.add_paragraph("Action Items", style='Heading 3')
-            for item in enumerate(summary["action_items"],1):
-                document.add_paragraph(item, style='Normal')
-            
-            temp_path = "temp_" + local_fname
-            self.logger.info('Saving google document to temp file')
-            document.save(temp_path)
-
-            self.logger.info('Uploading google document to Cloud')
-            updated_doc_id = self.upload_document(local_fname, temp_path)
+                self.logger.info('Uploading google document to Cloud')
+                updated_doc_id = self.upload_document(local_fname, temp_path)
+            except Exception as e:
+                self.logger.info(f"Failed to create google document and uplaod {e}")
 
             # Clean up the temporary local file
             os.remove(temp_path)

@@ -102,12 +102,15 @@ class TranscriptionManager():
         Get a summary of the meeting including objective, key points, and action items.
         """
         
-        summary = self.create_gpt_response('Total combined word count of objective, key points and action items should be less than half of the word count of original transcript.'
-                                           ' Ensure clarity and presentation quality in the sentence formation. The summary should be structured as follows: '
-                                           '{"objective": "Brief paragraph on the meeting objective", "key_points": ["1. Key point..", "2. Key point 2", ...],"action_items": ["1. Action item", "2. Action item", ...]}' , 
-                                           'Now Provide a summary of the meeting transcript')
+        self.create_gpt_response("Total combined word count of objective, key points and action items should be less than half of the word count of original transcript."
+                                "Ensure clarity and presentation quality in the sentence formation. Don't Summarize yet.","")
         
-        return summary
+        objective = self.create_gpt_response("Brief paragraph on the meeting objective", "Now Provide Objective of the meeting")
+        self.logger.info(objective)
+        key_points_and_tasks = self.create_gpt_response('Always structure the response in the form of list like this ##Key Points: 1. Key point.., 2. Key point, ... ##Action Items: 1. Action item.., 2. Action item, ...',"Now provide key points and action items")
+        self.logger.info(key_points_and_tasks)
+        
+        return {"objective": objective, "key_points_and_tasks": key_points_and_tasks}
 
     def process_and_summarize(self, segments):
         """
@@ -122,15 +125,17 @@ class TranscriptionManager():
     def create_summary_audio(self, summary):
             
         meeting_summary = os.path.join(os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.dirname(__file__)),  "..", "meeting_summary.mp3")
-
-        summary_text = f"{summary['objective']}. Key Points disscussed were {summary['key_points']}. Tasks that were pending {summary['action_items']}. Alright, it's time for me to switch gears from talk mode to stalk mode. I'm now entering record mode to capture today's discussion!"    
-        
-        response = self.client.audio.speech.create(
-            model="tts-1",
-            voice="onyx",
-            input=summary_text
-        )
-        response.stream_to_file(meeting_summary)
+        try:
+            summary_text = f"{summary['objective']} {summary['key_points_and_tasks']}. Alright, it's time for me to switch gears from talk mode to stalk mode. I'm now entering record mode to capture today's discussion!"    
+            
+            response = self.client.audio.speech.create(
+                model="tts-1",
+                voice="onyx",
+                input=summary_text
+            )
+            response.stream_to_file(meeting_summary)
+        except Exception as e:
+            self.logger.info(f"Failed to create meeting summary audio {e}")
 
     def create_minutes(self):
         """Generate minutes for a meeting."""
@@ -140,13 +145,8 @@ class TranscriptionManager():
         doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
         segments = self.split_transcript()
         summary = self.process_and_summarize(segments)[0]
-        try:
-            summary = json.loads(summary)
-        except Exception as e:
-            self.logger.error(f"Error {e}")
-        # summary = "Update the Google Doc with the given summary, local file name, and date. param summary: The summary to add to the Google Doc (list of strings)"
-        # "param local_fname: The local temp file name of the Word document :param date: The date to add to the Google Doc The updated Google Doc ID"
         if summary:
+            self.logger.info(summary)
             self.conversation_history = []
             gsm.update_docx_on_drive(summary, doc_name, formatted_date)
             self.create_summary_audio(summary)
