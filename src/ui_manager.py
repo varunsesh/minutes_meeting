@@ -31,7 +31,7 @@ class UIManager(QMainWindow):
         if cuda_available:
             self.logger.info("CUDA is available. GPU support is enabled.")
             self.logger.info("Loading Medium whisper model")
-            self.model = whisper.load_model("large")
+            self.model = whisper.load_model("medium")
         else:
             self.logger.info("CUDA is not available. GPU support is disabled. Loading Tiny whisper model")
             self.model = whisper.load_model("tiny")

@@ -1,5 +1,5 @@
 import logging
-import os, sys
+import os, sys, json
 from datetime import datetime
 from openai import OpenAI
 from src.google_api_manager import GoogleAPIManager
@@ -17,12 +17,11 @@ class TranscriptionManager():
     
     def init_openai_client(self):
         hasKey = os.environ.get("OPENAI_API_KEY")
-        if hasKey:
-            self.client = OpenAI()
-        else:
-            # prompt_and_get_openai_key
-            # self.client = OpenAI(api_key:openai_key)
-            self.logger.warning("Missing OpenAI key")
+        if not hasKey:
+            self.logger.error("Missing OpenAI API Key")
+            return
+        return OpenAI()
+            
 
 
     def create_transcript(self):
@@ -140,13 +139,13 @@ class TranscriptionManager():
         formatted_date = now.strftime("%B %d, %Y")
         doc_name = 'minutes_' + now.strftime("%B_%d_%Y") + '.docx'
         segments = self.split_transcript()
-        # summary = self.process_and_summarize(segments)[0]
-        # try:
-        #     summary = json.loads(summary)
-        # except Exception as e:
-        #     self.logger.error(f"Error {e}")
-        summary = "Update the Google Doc with the given summary, local file name, and date. param summary: The summary to add to the Google Doc (list of strings)"
-        "param local_fname: The local temp file name of the Word document :param date: The date to add to the Google Doc The updated Google Doc ID"
+        summary = self.process_and_summarize(segments)[0]
+        try:
+            summary = json.loads(summary)
+        except Exception as e:
+            self.logger.error(f"Error {e}")
+        # summary = "Update the Google Doc with the given summary, local file name, and date. param summary: The summary to add to the Google Doc (list of strings)"
+        # "param local_fname: The local temp file name of the Word document :param date: The date to add to the Google Doc The updated Google Doc ID"
         if summary:
             self.conversation_history = []
             gsm.update_docx_on_drive(summary, doc_name, formatted_date)
